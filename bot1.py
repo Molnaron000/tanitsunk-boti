@@ -55,13 +55,13 @@ def ajanlo_bot_valasz(felhasznalo_kerdese):
 
 # --- 2. LÉPÉS: Streamlit Felület ---
 
-st.set_page_config(layout="centered", page_title="TM Programajánló Bot")
+st.set_page_config(layout="centered", page_title="Tanítsunk Boti")
 
-st.title("📚 TM Programajánló Bot")
+st.title("Tanítsunk Boti")
 st.markdown("""
-    Üdv! Ez a bot segítséget nyújt a **'Tanítsunk Magyarországért' programmal** kapcsolatos alapvető kérdésekben.
+    Szia! Boti segítséget nyújt a **'Neumann János Egyetem Tanítsunk Magyarországért' program mentorainak**.
     Jelenleg még az általános tudásomra támaszkodom a specifikus adatok hiányában,
-    de hamarosan képes leszek a 'Tanítsunk Magyarországért' program hivatalos dokumentumaiból válaszolni!
+    de hamarosan képes leszek a 'Tanítsunk Magyarországért' program dokumentumaiból válaszolni!
     """)
 
 # Kezdeményezzük a beszélgetési előzményt, ha még nincs
@@ -73,18 +73,18 @@ for message in st.session_state.conversation_history:
     st.markdown(message)
 
 # Felhasználói beviteli mező
-user_input = st.chat_input("Kérdezz a programról... (pl. Hogyan lehet jelentkezni?)")
+user_input = st.chat_input("Miben segíthetek?")
 
 if user_input:
     # A felhasználó kérdése
     st.session_state.conversation_history.append(f"**Te:** {user_input}")
 
     # "Gondolkodó" állapot
-    with st.spinner("A bot gondolkodik..."):
+    with st.spinner("Boti gondolkodik..."):
         # Hívjuk a bot "agyát"
         bot_valasz = ajanlo_bot_valasz(user_input)
-        st.session_state.conversation_history.append(f"**TM Bot:** {bot_valasz}")
+        st.session_state.conversation_history.append(f"**Tanítsunk Boti:** {bot_valasz}")
     st.rerun() # Frissíti az oldalt, hogy megjelenjen az új üzenet
 
 st.write("---")
-st.info("Ez egy kezdeti bot a 'Tanítsunk Magyarországért' programhoz. A válaszok most már a Gemini AI-tól származhatnak, de még nem használ specifikus adatbázisokat.")
+st.info("Ez egy kezdeti bot a 'Neumann János Egyetem Tanítsunk Magyarországért' programhoz. A válaszok most már a Gemini AI-tól származhatnak, de még nem használ specifikus adatbázisokat.")
