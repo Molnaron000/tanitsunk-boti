@@ -66,7 +66,7 @@ st.markdown("""
 
 # Kezdeményezzük a beszélgetési előzményt, ha még nincs
 if 'conversation_history' not in st.session_state:
-    st.session_state.conversation_history = ["**TM Bot:** Szia! Miben segíthetek a 'Tanítsunk Magyarországért' programmal kapcsolatban?"]
+    st.session_state.conversation_history = ["**Tanítsunk Boti:** Szia! Miben segíthetek a 'Tanítsunk Magyarországért' programmal kapcsolatban?"]
 
 # Beszélgetési előzmények megjelenítése
 for message in st.session_state.conversation_history:
