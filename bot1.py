@@ -1,18 +1,24 @@
 import streamlit as st
 import google.generativeai as genai
+import os
+from dotenv import load_dotenv
 import json
 from google.oauth2 import service_account
 from google.cloud import storage
 import pandas as pd
 import PyPDF2
 import io
+import ast
 
 # --- 0. LÉPÉS: API kulcsok beállítása ---
-try:
-    genai.configure(api_key=st.secrets['GOOGLE_API_KEY'])
-except Exception as e:
-    st.error("❌ Hiba a Gemini API kulcsnál. Ellenőrizd a Streamlit Secrets-ben a 'GOOGLE_API_KEY'-t.")
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+if not GOOGLE_API_KEY:
+    st.error("A Google API kulcs nem található!")
     st.stop()
+
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- GCS hitelesítés ---
 try:
@@ -65,7 +71,14 @@ def read_excel_from_gcs(bucket_name, file_name):
 # --- Társasjáték-ajánló logika ---
 def ajanlj_tarsasjatekot(jatekos_szam, ido_preferencia, iskola, df):
     eredmenyek = []
-    df_filtered = df[df["Játékosok száma"].apply(lambda x: jatekos_szam in eval(x))]
+    def szam_belefer(s):
+        try:
+            lista = ast.literal_eval(s)
+            return jatekos_szam in lista
+        except:
+            return False
+
+    df_filtered = df[df["Játékosok száma"].apply(szam_belefer)]
     df_filtered = df_filtered[df_filtered["30 perc"] == ido_preferencia.lower()]
     df_filtered = df_filtered[df_filtered[iskola] == "van"]
 
