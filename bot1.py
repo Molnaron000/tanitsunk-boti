@@ -80,7 +80,11 @@ def ajanlj_tarsasjatekot(jatekos_szam, ido_preferencia, iskola, df):
 
     df_filtered = df[df["Játékosok száma"].apply(szam_belefer)]
     df_filtered = df_filtered[df_filtered["30 perc"] == ido_preferencia.lower()]
-    df_filtered = df_filtered[df_filtered[iskola] == "van"]
+
+    if iskola in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered[iskola] == "van"]
+    else:
+        return f"⚠️ A megadott iskola („{iskola}”) nem szerepel az Excel fájlban oszlopként."
 
     for _, sor in df_filtered.iterrows():
         szoveg = f"""🎉 Kiváló választás! Íme a részletek a(z) **{sor['Név']}** játékról:
