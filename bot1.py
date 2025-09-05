@@ -1,3 +1,4 @@
+
 # bot1.py — Tanítsunk Boti: hű nyitó (👉 link + emoji) + „Király helyek” belső oldal (Markdownból)
 # -----------------------------------------------------------------------------------------------
 # Futtatás:
@@ -9,7 +10,7 @@
 #   ├─ bot1.py
 #   ├─ requirements.txt
 #   └─ content/
-#      └─ kecskemet.md      ← IDE tedd a „Király helyek Kecskeméten” Markdown fájlt
+#      └─ kecskemeten.md     ← IDE tedd a „Király helyek Kecskeméten” Markdown fájlt
 
 import os
 from pathlib import Path
@@ -70,21 +71,21 @@ LINKS = [
      "https://chatgpt.com/g/g-6891f5b1b2e08191865f1202d89a8336-pedagogia-asszisztens", "🧑‍🏫"),
     ("Mentori Email Segéd",
      "https://chatgpt.com/g/g-68a9f80cdef0819185fdb7cc0299d28d-nje-tm-mentori-email-seged", "📧"),
-    # Külső link is marad, DE ezt belső oldalon is meg tudjuk nyitni a Markdownból:
+    # Külső link megmarad, de belső oldalról is megnyitható az MD-ből:
     ("Király helyek Kecskeméten",
      "https://chatgpt.com/g/g-68aafdc328888191ba3d4ded8ec96d07-nje-tm-kiraly-helyek-kecskemeten", "🎡"),
 ]
 
-# ===== Markdown betöltés a content/kecskemet.md-ből =====
+# ===== Markdown betöltés a content/kecskemeten.md-ből =====
 BASE_DIR = Path(__file__).parent
-MD_PATH = BASE_DIR / "content" / "kecskemet.md"
+MD_PATH = BASE_DIR / "content" / "kecskemeten.md"
 
 @st.cache_data(show_spinner=False)
 def load_md(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        return "⚠️ A `content/kecskemet.md` nem található. Hozd létre a fájlt ebben a mappában!"
+        return "⚠️ A `content/kecskemeten.md` nem található. Hozd létre a fájlt ebben a mappában!"
     except Exception as e:
         return f"⚠️ Hiba a Markdown beolvasásakor: {e}"
 
@@ -111,14 +112,12 @@ def render_home():
 
     st.markdown('<div class="links">', unsafe_allow_html=True)
     for text, url, emoji in LINKS:
-        # sor: 👉 link + emoji  (az eredeti formátum szerint)
         st.markdown(
             f'<div class="link-row"><span class="arrow">👉</span>'
             f'<a href="{url}" target="_blank" rel="noopener">{text}</a>'
             f'<span class="emoji">{emoji}</span></div>',
             unsafe_allow_html=True,
         )
-        # plusz: ha „Király helyek…”, adjunk egy belső megnyitó gombot is
         if text == "Király helyek Kecskeméten":
             if st.button("📍 Megnyitás itt (belső oldal)", key="open-kecskemet", use_container_width=True):
                 go("kecskemet")
@@ -126,7 +125,6 @@ def render_home():
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-    # Tipp a használathoz
     st.markdown('<span class="hint-title">ℹ️ Tipp a használathoz</span>', unsafe_allow_html=True)
     st.markdown(
         '<p class="small">Az @<em>említéssel</em> bármelyik <code>Boti</code>-t könnyedén elérheted itt, a beszélgetésen belül – így gyorsan, témára szabott választ kapsz!</p>',
@@ -153,7 +151,6 @@ def render_home():
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-    # Üzenetkorlát
     st.markdown('<span class="hint-title">⏳ Üzenetkorlát (ingyenes fiók)</span>', unsafe_allow_html=True)
     st.markdown(
         '<p class="small">Ingyenes felhasználók <strong>10 üzenetet</strong> küldhetnek 5 óránként. '
@@ -163,7 +160,6 @@ def render_home():
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-    # Visszajelzés blokk
     st.markdown('<span class="hint-title">💬 Visszajelzésed számít!</span>', unsafe_allow_html=True)
     st.markdown(
         """
@@ -249,12 +245,10 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
             with colB:
                 st.caption("A beszélgetés helyben marad az oldal bezárásáig.")
 
-            # előzmények
             for role, text in st.session_state.gemini_msgs:
                 with st.chat_message("assistant" if role == "model" else role):
                     st.markdown(text)
 
-            # üzenet
             user_msg = st.chat_input("Írj üzenetet… ('444' = visszajelzés sablon)")
             if user_msg is not None:
                 if user_msg.strip() == "444":
@@ -268,8 +262,6 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
                     st.session_state.gemini_msgs.append(("user", user_msg))
                     with st.chat_message("user"):
                         st.markdown(user_msg)
-
-                    # streaming válasz
                     try:
                         stream = st.session_state.gemini_session.send_message(user_msg, stream=True)
                         chunks = []
@@ -284,5 +276,4 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
                         full = "".join(chunks).strip()
                     except Exception as e:
                         full = f"Hiba a Gemini válasznál: {e}"
-
                     st.session_state.gemini_msgs.append(("model", full))
