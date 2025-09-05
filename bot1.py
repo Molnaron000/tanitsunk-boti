@@ -15,10 +15,9 @@ import os
 from pathlib import Path
 import streamlit as st
 
-# ===== Alap beállítások =====
+# ===== Alap =====
 st.set_page_config(page_title="Tanítsunk Boti – Választó", page_icon="🤖", layout="centered")
 
-# ===== Segédfüggvény: kompatibilis újrarender =====
 def _rerun():
     if hasattr(st, "rerun"):
         st.rerun()
@@ -27,31 +26,46 @@ def _rerun():
     else:
         st.stop()
 
-# ===== Stílus (hű az eredeti UX-hez) =====
+# ===== Stílus =====
 st.markdown(
     """
     <style>
       :root { --text:#0f172a; --muted:#475569; --accent:#2563eb; --border:#e5e7eb; }
       .container { max-width: 820px; margin: 24px auto 60px; }
-      .card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 24px 22px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
-      h1 { font-size: 1.35rem; margin: 0 0 10px 0; color: var(--text); }
-      p, li, a, div { font-size: 1rem; line-height: 1.6; color: var(--text); }
-      .hello { font-weight: 700; }
-      .hint-title { font-weight: 700; display: block; margin-top: 14px; }
+      .card { background:#fff; border:1px solid var(--border); border-radius:16px; padding:24px 22px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+      h1 { font-size:1.35rem; margin:0 0 10px 0; color:var(--text); }
+      p, li, a, div { font-size:1rem; line-height:1.6; color:var(--text); }
+      .hello { font-weight:700; }
+      .hint-title { font-weight:700; display:block; margin-top:14px; }
+      .divider { height:1px; background:var(--border); margin:18px 0; }
+      .small { color:var(--muted); font-size:.95rem; }
+      .bullets { margin:8px 0 0 0; padding-left:18px; }
+      .bullets li { color:var(--muted); margin:4px 0; }
+      .footer { margin-top:10px; }
+      .footer a { color:var(--accent); text-decoration:none; }
+      .spacer { height:6px; }
+      .back { margin-bottom:14px; }
+
+      /* ——— Letisztult link-sor kártya + jobb oldali „ghost” gomb ——— */
       .links { margin: 14px 0 8px; }
-      .link-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; transition: background .15s ease; }
-      .link-row:hover { background: #f8fafc; }
-      .arrow { margin-right: 2px; }
-      .link-row a { color: var(--accent); text-decoration: none; font-weight: 600; }
-      .emoji { margin-left: 6px; }
-      .divider { height: 1px; background: var(--border); margin: 18px 0; }
-      .small { color: var(--muted); font-size: .95rem; }
-      .bullets { margin: 8px 0 0 0; padding-left: 18px; }
-      .bullets li { color: var(--muted); margin: 4px 0; }
-      .footer { margin-top: 10px; }
-      .footer a { color: var(--accent); text-decoration: none; }
-      .spacer { height: 6px; }
-      .back { margin-bottom: 14px; }
+      .link-row {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:10px 14px; margin:8px 0;
+        border:1px solid var(--border); border-radius:12px; background:#fff;
+        transition: background .15s ease, border-color .15s ease;
+      }
+      .link-row:hover { background:#f8fafc; border-color:#d1d5db; }
+      .link-main { display:flex; align-items:center; gap:8px; font-weight:600; }
+      .link-main a { color:var(--accent); text-decoration:none; }
+      .link-main .arrow { margin-right:2px; }
+      .link-main .emoji { margin-left:6px; }
+      .inline-btn { margin-left:12px; }
+      .inline-btn button {
+        padding:6px 12px; border-radius:999px;
+        background:#fff; border:1px solid var(--border);
+        font-size:.92rem; font-weight:600;
+      }
+      .inline-btn button:hover { background:#f8fafc; border-color:#d1d5db; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -94,7 +108,7 @@ def load_md(path: Path) -> str:
     except FileNotFoundError:
         return "⚠️ A `content/kecskemeten.md` nem található. Hozd létre a fájlt ebben a mappában!"
     except Exception as e:
-        return f"⚠️ Hiba a Markdown beolvasásakor: {e}"
+        return "⚠️ Hiba a Markdown beolvasásakor: {}".format(e)
 
 KIRALY_HELYEK_MD = load_md(MD_PATH)
 
@@ -106,32 +120,38 @@ def go(view: str):
     st.session_state.view = view
     _rerun()
 
-# ===== HOME (eredeti nyitó) =====
+# ===== HOME =====
 def render_home():
     st.markdown('<div class="container">', unsafe_allow_html=True)
     st.markdown('<div class="card">', unsafe_allow_html=True)
 
     st.markdown('<h1 class="hello">Szia, örülök, hogy itt vagy! 😊</h1>', unsafe_allow_html=True)
-    st.markdown(
-        "<p>Nézzük meg együtt, miben tudok segíteni. Válassz egy témát, és indulhatunk is: 👇</p>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("<p>Nézzük meg együtt, miben tudok segíteni. Válassz egy témát, és indulhatunk is: 👇</p>",
+                unsafe_allow_html=True)
 
     st.markdown('<div class="links">', unsafe_allow_html=True)
+
     for text, url, emoji in LINKS:
-        st.markdown(
-            f'<div class="link-row"><span class="arrow">👉</span>'
-            f'<a href="{url}" target="_blank" rel="noopener">{text}</a>'
-            f'<span class="emoji">{emoji}</span></div>',
-            unsafe_allow_html=True,
+        # bal oldal (👉 link + emoji)
+        left_html = (
+            f'<div class="link-main">'
+            f'  <span class="arrow">👉</span>'
+            f'  <a href="{url}" target="_blank" rel="noopener">{text}</a>'
+            f'  <span class="emoji">{emoji}</span>'
+            f'</div>'
         )
+        # csak a „Király helyek…” sornál jelenik meg a jobb oldali, kis ghost gomb
         if text == "Király helyek Kecskeméten":
-            if st.button("📍 Megnyitás itt (belső oldal)", key="open-kecskemet", use_container_width=True):
+            st.markdown(f'<div class="link-row">{left_html}<div class="inline-btn">', unsafe_allow_html=True)
+            if st.button("📍 Megnyitás itt", key="open-kecskemet-inline"):
                 go("kecskemet")
+            st.markdown('</div></div>', unsafe_allow_html=True)  # /inline-btn + /link-row
+        else:
+            st.markdown(f'<div class="link-row">{left_html}</div>', unsafe_allow_html=True)
+
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
     st.markdown('<span class="hint-title">ℹ️ Tipp a használathoz</span>', unsafe_allow_html=True)
     st.markdown(
         '<p class="small">Az @<em>említéssel</em> bármelyik <code>Boti</code>-t könnyedén elérheted itt, a beszélgetésen belül – így gyorsan, témára szabott választ kapsz!</p>',
@@ -157,7 +177,6 @@ def render_home():
     )
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
     st.markdown('<span class="hint-title">⏳ Üzenetkorlát (ingyenes fiók)</span>', unsafe_allow_html=True)
     st.markdown(
         '<p class="small">Ingyenes felhasználók <strong>10 üzenetet</strong> küldhetnek 5 óránként. '
@@ -166,7 +185,6 @@ def render_home():
     )
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
     st.markdown('<span class="hint-title">💬 Visszajelzésed számít!</span>', unsafe_allow_html=True)
     st.markdown(
         """
@@ -177,7 +195,7 @@ def render_home():
           <div>👨‍💻 <strong>Készítette:</strong> Molnár Áron</div>
           <div>🎓 <a href="https://www.linkedin.com/in/áron-molnár-867251311/" target="_blank" rel="noopener">LinkedIn profil</a></div>
           <div>📘 <a href="https://www.facebook.com/aron.molnar.716#" target="_blank" rel="noopener">Facebook-oldalam</a></div>
-          <div>💌 <a href="mailto:tanitsunk.boti@gmail.com?subject=Tan%C3%ADtsunk%20Boti%20-%20Visszajelz%C3%A9s&body=Szia%20%C3%81ron!%0D%0A%0D%0ATelep%C3%BCl%C3%A9s%20/%20Oszt%C3%A1ly:%0D%0A[pl.%20P%C3%A1hi%206.a]%0D%0A%0D%0ABoti:%0D%0A[pl.%20NJE-TM%20Kreat%C3%ADv%20foglalkozások]%0D%0A%0D%0A%E2%9C%85%20Ami%20tetszett:%0D%0A[Pl.%20vicces%20volt,%20jól%20válaszolt,%20segített%20egy%20konkrét%20feladatban%E2%80%A6]%0D%0A%0D%0A%E2%9A%A0%EF%B8%8F%20Ami%20kevésbé%20jött%20be%20vagy%20lehetne%20jobb:%0D%0A[Pl.%20túl%20hosszú%20volt%20a%20válasz,%20nem%20találta%20el%20a%20lényeget%E2%80%A6]%0D%0A%0D%0A%F0%9F%92%A1%20Ötletem%20/%20javaslatom:%0D%0A[Pl.%20legyen%20benne%20új%20téma,%20bővüljön%20játéklistával,%20stb.]%0D%0A%0D%0ARemélem,%20hasznos%20lesz!%20%0D%0A%0D%0APuszi,%0D%0A[Név%20vagy%20becenév])" target="_blank" rel="noopener">Írj e-mailt</a> – Írj bátran!</div>
+          <div>💌 <a href="mailto:tanitsunk.boti@gmail.com?subject=Tan%C3%ADtsunk%20Boti%20-%20Visszajelz%C3%A9s&body=Szia%20%C3%81ron!%0D%0A%0D%0ATelep%C3%BCl%C3%A9s%20/%20Oszt%C3%A1ly:%0D%0A[pl.%20P%C3%A1hi%206.a]%0D%0A%0D%0ABoti:%0D%0A[pl.%20NJE-TM%20Kreat%C3%ADv%20foglalkozások]%0D%0A%0D%0A%E2%9C%85%20Ami%20tetszett:%0D%0A[Pl.%20vicces%20volt,%20jól%20válaszolt,%20segített%20egy%20konkrét%20feladatban%E2%80%A6]%0D%0A%0D%0A%E2%9A%A0%EF%B8%8F%20Ami%20kevésbé%20jött%20be%20vagy%20lehetne%20jobb:%0D%0A[Pl.%20túl%20hosszú%20volt%20a válasz,%20nem%20találta%20el%20a%20lényeget%E2%80%A6]%0D%0A%0D%0A%F0%9F%92%A1%20Ötletem%20/%20javaslatom:%0D%0A[Pl.%20legyen%20benne%20új%20téma,%20bővüljön%20játéklistával,%20stb.]%0D%0A%0D%0ARemélem,%20hasznos%20lesz!%20%0D%0A%0D%0APuszi,%0D%0A[Név%20vagy%20becenév])" target="_blank" rel="noopener">Írj e-mailt</a> – Írj bátran!</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -186,12 +204,12 @@ def render_home():
     st.markdown('</div>', unsafe_allow_html=True)  # /card
     st.markdown('</div>', unsafe_allow_html=True)  # /container
 
-# ===== KIRÁLY HELYEK OLDAL (Markdownból) =====
+# ===== KIRÁLY HELYEK OLDAL =====
 def render_kecskemet():
     st.markdown('<div class="container">', unsafe_allow_html=True)
     st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    if st.button("← Vissza a menübe", key="back", use_container_width=False):
+    if st.button("← Vissza a menübe", key="back"):
         go("home")
 
     st.markdown("### 🎡 Király helyek Kecskeméten", unsafe_allow_html=False)
@@ -206,7 +224,7 @@ if st.session_state.view == "home":
 else:
     render_kecskemet()
 
-# ===== (OPCIONÁLIS) Lenyitható Gemini chat — csak ha van kulcs és lib =====
+# ===== (OPCIONÁLIS) Lenyitható Gemini chat =====
 with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=False):
     api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -252,12 +270,12 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
             with colB:
                 st.caption("A beszélgetés helyben marad az oldal bezárásáig.")
 
-            # előzmények kirajzolása
+            # előzmények
             for role, text in st.session_state.gemini_msgs:
                 with st.chat_message("assistant" if role == "model" else role):
                     st.markdown(text)
 
-            # üzenet bekérés
+            # üzenet
             user_msg = st.chat_input("Írj üzenetet… ('444' = visszajelzés sablon)")
             if user_msg is not None:
                 if user_msg.strip() == "444":
@@ -284,7 +302,6 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
                                     placeholder.markdown(acc)
                         full = "".join(chunks).strip()
                     except Exception as e:
-                        # NEM f-string, hogy biztosan ne legyen "unterminated f-string" hiba
                         full = "Hiba a Gemini válasznál: {}".format(e)
                     st.session_state.gemini_msgs.append(("model", full))
 
