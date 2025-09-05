@@ -284,4 +284,7 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
                                     placeholder.markdown(acc)
                         full = "".join(chunks).strip()
                     except Exception as e:
-                        full = f"Hiba a Ge
+                        # NEM f-string, hogy biztosan ne legyen "unterminated f-string" hiba
+                        full = "Hiba a Gemini válasznál: {}".format(e)
+                    st.session_state.gemini_msgs.append(("model", full))
+
