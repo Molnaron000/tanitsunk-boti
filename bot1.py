@@ -1,11 +1,10 @@
-
 # bot1.py — Tanítsunk Boti: hű nyitó (👉 link + emoji) + „Király helyek” belső oldal (Markdownból)
 # -----------------------------------------------------------------------------------------------
 # Futtatás:
 #   pip install -r requirements.txt
 #   streamlit run bot1.py
 #
-# Könyvtárstruktúra (GitHubon is így ajánlott):
+# Könyvtárstruktúra:
 #   tanitsunk-boti/
 #   ├─ bot1.py
 #   ├─ requirements.txt
@@ -18,6 +17,15 @@ import streamlit as st
 
 # ===== Alap beállítások =====
 st.set_page_config(page_title="Tanítsunk Boti – Választó", page_icon="🤖", layout="centered")
+
+# ===== Segédfüggvény: kompatibilis újrarender =====
+def _rerun():
+    if hasattr(st, "rerun"):
+        st.rerun()
+    elif hasattr(st, "experimental_rerun"):
+        st.experimental_rerun()
+    else:
+        st.stop()
 
 # ===== Stílus (hű az eredeti UX-hez) =====
 st.markdown(
@@ -71,7 +79,6 @@ LINKS = [
      "https://chatgpt.com/g/g-6891f5b1b2e08191865f1202d89a8336-pedagogia-asszisztens", "🧑‍🏫"),
     ("Mentori Email Segéd",
      "https://chatgpt.com/g/g-68a9f80cdef0819185fdb7cc0299d28d-nje-tm-mentori-email-seged", "📧"),
-    # Külső link megmarad, de belső oldalról is megnyitható az MD-ből:
     ("Király helyek Kecskeméten",
      "https://chatgpt.com/g/g-68aafdc328888191ba3d4ded8ec96d07-nje-tm-kiraly-helyek-kecskemeten", "🎡"),
 ]
@@ -97,7 +104,7 @@ if "view" not in st.session_state:
 
 def go(view: str):
     st.session_state.view = view
-    st.experimental_rerun()
+    _rerun()
 
 # ===== HOME (eredeti nyitó) =====
 def render_home():
@@ -241,14 +248,16 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
                 if st.button("🔄 Új beszélgetés"):
                     st.session_state.gemini_session = model.start_chat(history=[])
                     st.session_state.gemini_msgs = []
-                    st.experimental_rerun()
+                    _rerun()
             with colB:
                 st.caption("A beszélgetés helyben marad az oldal bezárásáig.")
 
+            # előzmények kirajzolása
             for role, text in st.session_state.gemini_msgs:
                 with st.chat_message("assistant" if role == "model" else role):
                     st.markdown(text)
 
+            # üzenet bekérés
             user_msg = st.chat_input("Írj üzenetet… ('444' = visszajelzés sablon)")
             if user_msg is not None:
                 if user_msg.strip() == "444":
@@ -275,5 +284,4 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
                                     placeholder.markdown(acc)
                         full = "".join(chunks).strip()
                     except Exception as e:
-                        full = f"Hiba a Gemini válasznál: {e}"
-                    st.session_state.gemini_msgs.append(("model", full))
+                        full = f"Hiba a Ge
