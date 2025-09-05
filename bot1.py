@@ -1,4 +1,5 @@
 # bot1.py — Tanítsunk Boti: hű nyitó (👉 link + emoji) + „Király helyek” belső oldal (Markdownból)
+# Gemini chat úgy bővítve, hogy lássa a kecskeméti listát és ajánlást adjon belőle.
 # -----------------------------------------------------------------------------------------------
 # Futtatás:
 #   pip install -r requirements.txt
@@ -44,7 +45,6 @@ st.markdown(
       .footer { margin-top:10px; }
       .footer a { color:var(--accent); text-decoration:none; }
       .spacer { height:6px; }
-      .back { margin-bottom:14px; }
 
       /* ——— Letisztult link-sor kártya + jobb oldali „ghost” gomb ——— */
       .links { margin: 14px 0 8px; }
@@ -132,7 +132,6 @@ def render_home():
     st.markdown('<div class="links">', unsafe_allow_html=True)
 
     for text, url, emoji in LINKS:
-        # bal oldal (👉 link + emoji)
         left_html = (
             f'<div class="link-main">'
             f'  <span class="arrow">👉</span>'
@@ -140,12 +139,11 @@ def render_home():
             f'  <span class="emoji">{emoji}</span>'
             f'</div>'
         )
-        # csak a „Király helyek…” sornál jelenik meg a jobb oldali, kis ghost gomb
         if text == "Király helyek Kecskeméten":
             st.markdown(f'<div class="link-row">{left_html}<div class="inline-btn">', unsafe_allow_html=True)
-            if st.button("📍 Megnyitás itt", key="open-kecskemet-inline"):
+            if st.button("📎 Megnyitás itt", key="open-kecskemet-inline"):
                 go("kecskemet")
-            st.markdown('</div></div>', unsafe_allow_html=True)  # /inline-btn + /link-row
+            st.markdown('</div></div>', unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="link-row">{left_html}</div>', unsafe_allow_html=True)
 
@@ -157,25 +155,17 @@ def render_home():
         '<p class="small">Az @<em>említéssel</em> bármelyik <code>Boti</code>-t könnyedén elérheted itt, a beszélgetésen belül – így gyorsan, témára szabott választ kapsz!</p>',
         unsafe_allow_html=True,
     )
-
     st.markdown('<span class="hint-title">✨ Így használd:</span>', unsafe_allow_html=True)
     st.markdown(
         '<p class="small">Kezdd el beírni: <code>@NJE-TM</code><br>Ezután válaszd ki azt a <code>Boti</code>-t, akire szükséged van (pl. 🎨 Kreatív foglalkozások), és máris kérdezhetsz tőle!</p>',
         unsafe_allow_html=True,
     )
-
     st.markdown('<span class="hint-title">⚠️ Fontos</span>', unsafe_allow_html=True)
-    st.markdown(
-        '<ul class="bullets"><li>Az @<em>említés</em> csak akkor működik, ha már beszéltél vele, vagy kitűzted az oldalsávodra.</li></ul>',
-        unsafe_allow_html=True,
-    )
-
+    st.markdown('<ul class="bullets"><li>Az @<em>említés</em> csak akkor működik, ha már beszéltél vele, vagy kitűzted az oldalsávodra.</li></ul>',
+                unsafe_allow_html=True)
     st.markdown('<span class="hint-title">🔗 Ha még nem beszéltél vele, vagy új témát kezdenél:</span>', unsafe_allow_html=True)
-    st.markdown(
-        '<p class="small">Kattints a fenti linkek egyikére – így tiszta lappal, az adott témára koncentrálva indíthatsz beszélgetést.</p>',
-        unsafe_allow_html=True,
-    )
-
+    st.markdown('<p class="small">Kattints a fenti linkek egyikére – így tiszta lappal, az adott témára koncentrálva indíthatsz beszélgetést.</p>',
+                unsafe_allow_html=True)
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     st.markdown('<span class="hint-title">⏳ Üzenetkorlát (ingyenes fiók)</span>', unsafe_allow_html=True)
     st.markdown(
@@ -183,7 +173,6 @@ def render_home():
         'A keret minden GPT-re közös, és 5 óránként automatikusan frissül.<br>💡 Ha elfogy, térj vissza később.</p>',
         unsafe_allow_html=True,
     )
-
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     st.markdown('<span class="hint-title">💬 Visszajelzésed számít!</span>', unsafe_allow_html=True)
     st.markdown(
@@ -195,7 +184,7 @@ def render_home():
           <div>👨‍💻 <strong>Készítette:</strong> Molnár Áron</div>
           <div>🎓 <a href="https://www.linkedin.com/in/áron-molnár-867251311/" target="_blank" rel="noopener">LinkedIn profil</a></div>
           <div>📘 <a href="https://www.facebook.com/aron.molnar.716#" target="_blank" rel="noopener">Facebook-oldalam</a></div>
-          <div>💌 <a href="mailto:tanitsunk.boti@gmail.com?subject=Tan%C3%ADtsunk%20Boti%20-%20Visszajelz%C3%A9s&body=Szia%20%C3%81ron!%0D%0A%0D%0ATelep%C3%BCl%C3%A9s%20/%20Oszt%C3%A1ly:%0D%0A[pl.%20P%C3%A1hi%206.a]%0D%0A%0D%0ABoti:%0D%0A[pl.%20NJE-TM%20Kreat%C3%ADv%20foglalkozások]%0D%0A%0D%0A%E2%9C%85%20Ami%20tetszett:%0D%0A[Pl.%20vicces%20volt,%20jól%20válaszolt,%20segített%20egy%20konkrét%20feladatban%E2%80%A6]%0D%0A%0D%0A%E2%9A%A0%EF%B8%8F%20Ami%20kevésbé%20jött%20be%20vagy%20lehetne%20jobb:%0D%0A[Pl.%20túl%20hosszú%20volt%20a válasz,%20nem%20találta%20el%20a%20lényeget%E2%80%A6]%0D%0A%0D%0A%F0%9F%92%A1%20Ötletem%20/%20javaslatom:%0D%0A[Pl.%20legyen%20benne%20új%20téma,%20bővüljön%20játéklistával,%20stb.]%0D%0A%0D%0ARemélem,%20hasznos%20lesz!%20%0D%0A%0D%0APuszi,%0D%0A[Név%20vagy%20becenév])" target="_blank" rel="noopener">Írj e-mailt</a> – Írj bátran!</div>
+          <div>💌 <a href="mailto:tanitsunk.boti@gmail.com?subject=Tan%C3%ADtsunk%20Boti%20-%20Visszajelz%C3%A9s&body=Szia%20%C3%81ron!%0D%0A%0D%0ATelep%C3%BCl%C3%A9s%20/%20Oszt%C3%A1ly:%0D%0A[pl.%20P%C3%A1hi%206.a]%0D%0A%0D%0ABoti:%0D%0A[pl.%20NJE-TM%20Kreat%C3%ADv%20foglalkozások]%0D%0A%0D%0A%E2%9C%85%20Ami%20tetszett:%0D%0A[Pl.%20vicces%20volt,%20jól%20válaszolt,%20segített%20egy%20konkrét%20feladatban%E2%80%A6]%0D%0A%0D%0A%E2%9A%A0%EF%B8%8F%20Ami%20kevésbé%20jött%20be%20vagy%20lehetne%20jobb:%0D%0A[Pl.%20túl%20hosszú%20volt%20a%20válasz,%20nem%20találta%20el%20a%20lényeget…]%0D%0A%0D%0A💡 Ötletem / javaslatom:%0D%0A[Pl.%20legyen%20benne%20új%20téma,%20bővüljön%20játéklistával,%20stb.]%0D%0A%0D%0ARemélem,%20hasznos%20lesz!%20%0D%0A%0D%0APuszi,%0D%0A[Név%20vagy%20becenév])" target="_blank" rel="noopener">Írj e-mailt</a> – Írj bátran!</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -224,7 +213,7 @@ if st.session_state.view == "home":
 else:
     render_kecskemet()
 
-# ===== (OPCIONÁLIS) Lenyitható Gemini chat =====
+# ===== (OPCIONÁLIS) Lenyitható Gemini chat — a lista automatikus csatolásával =====
 with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=False):
     api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -240,7 +229,8 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
             SYSTEM_PROMPT = (
                 "SZEREPED: Egy segítő, empatikus, lépésről lépésre magyarázó mentori AI. "
                 "NEVED: Tanítsunk Boti. Rövid, áttekinthető válaszok. "
-                "A '444' üzenetre add vissza a visszajelző sablont."
+                "Ha kapod a 'KIRÁLY_HELYEK_KECSKEMÉTEN' kontextust, abban található helyek közül javasolj, "
+                "és mindig linkeld a javasolt hely hivatalos oldalát. A '444' üzenetre add vissza a visszajelző sablont."
             )
             FEEDBACK_BLOCK = (
                 "Köszi, ha időt szánsz arra, hogy megoszd velem a gondolataid!🙏\n"
@@ -251,32 +241,67 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
                 "💌 [Írj e-mailt](mailto:tanitsunk.boti@gmail.com?subject=Tan%C3%ADtsunk%20Boti%20-%20Visszajelz%C3%A9s&body=Szia%20%C3%81ron!%0D%0A%0D%0ATelep%C3%BCl%C3%A9s%20/%20Oszt%C3%A1ly:%0D%0A[pl.%20P%C3%A1hi%206.a]%0D%0A%0D%0ABoti:%0D%0A[pl.%20NJE-TM%20Kreat%C3%ADv%20foglalkozások]%0D%0A%0D%0A%E2%9C%85%20Ami%20tetszett:%0D%0A[Pl.%20vicces%20volt,%20jól%20válaszolt,%20segített%20egy%20konkrét%20feladatban…]%0D%0A%0D%0A%E2%9A%A0%EF%B8%8F%20Ami%20kevésbé%20jött%20be%20vagy%20lehetne%20jobb:%0D%0A[Pl.%20túl%20hosszú%20volt%20a%20válasz,%20nem%20találta%20el%20a%20lényeget…]%0D%0A%0D%0A💡 Ötletem / javaslatom:%0D%0A[Pl.%20legyen%20benne%20új%20téma,%20bővüljön%20játéklistával,%20stb.]%0D%0A%0D%0ARemélem,%20hasznos%20lesz!%20%0D%0A%0D%0APuszi,%0D%0A[Név%20vagy%20becenév]) – **Írj bátran!**"
             )
 
+            # Beállítások a kontextus csatolásához
+            attach_auto = st.checkbox(
+                "Használja a „Király helyek Kecskeméten” listát a válaszokhoz",
+                value=True
+            )
+
             model = genai.GenerativeModel(
                 model_name="gemini-2.0-flash",
                 system_instruction=SYSTEM_PROMPT,
             )
 
+            # Chat-állapot inicializálása
             if "gemini_session" not in st.session_state:
                 st.session_state.gemini_session = model.start_chat(history=[])
-            if "gemini_msgs" not in st.session_state:
                 st.session_state.gemini_msgs = []
+                st.session_state.kecskemet_context_attached = False
 
-            colA, colB = st.columns([1, 1])
+            # Új beszélgetés gombok
+            colA, colB, colC = st.columns([1, 1, 1])
             with colA:
                 if st.button("🔄 Új beszélgetés"):
                     st.session_state.gemini_session = model.start_chat(history=[])
                     st.session_state.gemini_msgs = []
+                    st.session_state.kecskemet_context_attached = False
                     _rerun()
             with colB:
-                st.caption("A beszélgetés helyben marad az oldal bezárásáig.")
+                if st.button("📎 Lista újracsatolása"):
+                    try:
+                        ctx = (
+                            "KIRÁLY_HELYEK_KECSKEMÉTEN — KONTEKSTUS (Markdown):\n\n"
+                            + KIRALY_HELYEK_MD
+                        )
+                        _ = st.session_state.gemini_session.send_message(ctx)
+                        st.success("A kecskeméti lista csatolva a beszélgetéshez.")
+                        st.session_state.kecskemet_context_attached = True
+                    except Exception as e:
+                        st.error("Nem sikerült csatolni a listát: {}".format(e))
+            with colC:
+                st.caption("Kontextus állapota: {}".format(
+                    "✔ csatolva" if st.session_state.get("kecskemet_context_attached") else "✖ nincs csatolva"
+                ))
 
-            # előzmények
+            # Automatikus csatolás az első üzenet előtt
+            if attach_auto and not st.session_state.get("kecskemet_context_attached") and KIRALY_HELYEK_MD.strip():
+                try:
+                    ctx = (
+                        "KIRÁLY_HELYEK_KECSKEMÉTEN — KONTEKSTUS (Markdown):\n\n"
+                        + KIRALY_HELYEK_MD
+                    )
+                    _ = st.session_state.gemini_session.send_message(ctx)
+                    st.session_state.kecskemet_context_attached = True
+                except Exception as e:
+                    st.warning("Automatikus kontextus csatolás sikertelen: {}".format(e))
+
+            # Előzmények kirajzolása
             for role, text in st.session_state.gemini_msgs:
                 with st.chat_message("assistant" if role == "model" else role):
                     st.markdown(text)
 
-            # üzenet
-            user_msg = st.chat_input("Írj üzenetet… ('444' = visszajelzés sablon)")
+            # Üzenet
+            user_msg = st.chat_input("Írj üzenetet… (pl. „Ajánlj programot 6. osztályosoknak 2 órára.” vagy '444')")
             if user_msg is not None:
                 if user_msg.strip() == "444":
                     st.session_state.gemini_msgs.append(("user", user_msg))
@@ -289,6 +314,7 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
                     st.session_state.gemini_msgs.append(("user", user_msg))
                     with st.chat_message("user"):
                         st.markdown(user_msg)
+
                     try:
                         stream = st.session_state.gemini_session.send_message(user_msg, stream=True)
                         chunks = []
@@ -303,5 +329,5 @@ with st.expander("💬 Beszélgetés itt (Gemini) — opcionális", expanded=Fal
                         full = "".join(chunks).strip()
                     except Exception as e:
                         full = "Hiba a Gemini válasznál: {}".format(e)
-                    st.session_state.gemini_msgs.append(("model", full))
 
+                    st.session_state.gemini_msgs.append(("model", full))
