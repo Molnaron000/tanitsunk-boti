@@ -486,7 +486,7 @@ def _widget_injector_html(
 
           const title = D.createElement("div");
           title.id = "tb-title";
-          title.innerHTML = `<span style="font-size:16px">💠</span><span>${CONFIG.brandName}</span>`;
+          title.innerHTML = `<span style="font-size:16px">💠</span><span>${{CONFIG.brandName}}</span>`;
 
           const actions = D.createElement("div");
           actions.id = "tb-actions";
@@ -522,7 +522,7 @@ def _widget_injector_html(
           const iframe = D.createElement("iframe");
           iframe.id = "tb-iframe";
           iframe.src = buildChatUrl();
-          iframe.setAttribute("title", `${CONFIG.brandName} chat`);
+          iframe.setAttribute("title", `${{CONFIG.brandName}} chat`);
           iframe.setAttribute("loading", "lazy");
 
           iframeWrap.appendChild(iframe);
