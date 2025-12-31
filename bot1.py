@@ -99,18 +99,42 @@ def render_chat(embed: bool) -> None:
     export_flag = _qp_get(qp, "export", "").lower() in ("1", "true", "yes")
 
     if embed:
-        st.markdown(
+if embed:
+        # Háttérkép betöltése (assets/background.png)
+        bg_url = png_to_data_url("assets/background.png")
+
+        # Streamlit chrome elrejtése + opcionális háttérkép
+        css = """
+        <style>
+          #MainMenu {visibility: hidden;}
+          header {visibility: hidden;}
+          footer {visibility: hidden;}
+          .stApp {
+              padding-top: 0rem;
+        """
+
+        if bg_url:
+            css += f"""
+              background-image: url('{bg_url}');
+              background-size: cover;
+              background-position: top center;
+              background-repeat: no-repeat;
             """
-            <style>
-              #MainMenu {visibility: hidden;}
-              header {visibility: hidden;}
-              footer {visibility: hidden;}
-              .stApp {padding-top: 0rem;}
-              div.block-container {padding-top: 0.5rem; padding-bottom: 0.5rem;}
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
+
+        css += """
+          }
+          /* A fő tartalom kapjon halvány fehér hátteret, hogy olvasható maradjon */
+          div.block-container {
+              padding-top: 0.5rem;
+              padding-bottom: 0.5rem;
+              background: rgba(255,255,255,0.94);
+              border-radius: 16px;
+          }
+        </style>
+        """
+
+        st.markdown(css, unsafe_allow_html=True)
+
 
     if not embed:
         st.title(f"{BRAND_NAME} – Chat")
