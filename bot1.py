@@ -75,8 +75,7 @@ def apply_app_background() -> None:
             background-size: cover;
             background-position: top center;
             background-repeat: no-repeat;
-            background-attachment: fixed;
-          }}
+                      }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -87,13 +86,16 @@ def apply_app_background() -> None:
 # Views
 # ----------------------------
 def render_home() -> None:
-    # Empty page: only inject the floating widget (no title, no info box)
+    apply_app_background()
+
+    # Only background + floating icon. Hide Streamlit chrome.
     st.markdown(
         """
         <style>
+          #MainMenu {visibility: hidden;}
+          header {visibility: hidden; height: 0;}
+          footer {visibility: hidden; height: 0;}
           .block-container { padding-top: 0rem; padding-bottom: 0rem; }
-          header { visibility: hidden; height: 0; }
-          footer { visibility: hidden; height: 0; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -101,6 +103,7 @@ def render_home() -> None:
 
     icon_data_url = png_to_data_url(WIDGET_ICON_PNG_PATH)
 
+    # Inject the widget JS (it will create icon + overlay in the parent document)
     components.html(
         _widget_injector_html(
             brand_name=BRAND_NAME,
@@ -110,8 +113,8 @@ def render_home() -> None:
             widget_icon=WIDGET_ICON,
             widget_icon_data_url=icon_data_url,
         ),
-        height=1,
-        width=1,
+        height=0,
+        width=0,
     )
 
 def render_chat(embed: bool) -> None:
@@ -130,40 +133,19 @@ def render_chat(embed: bool) -> None:
     export_flag = _qp_get(qp, "export", "").lower() in ("1", "true", "yes")
 
     if embed:
-        # Háttérkép betöltése (assets/background.png)
-        bg_url = png_to_data_url("assets/background.png")
-
-        # Streamlit chrome elrejtése + opcionális háttérkép
-        css = """
-        <style>
-          #MainMenu {visibility: hidden;}
-          header {visibility: hidden;}
-          footer {visibility: hidden;}
-          .stApp {
-              padding-top: 0rem;
-        """
-
-        if bg_url:
-            css += f"""
-              background-image: url('{bg_url}');
-              background-size: cover;
-              background-position: top center;
-              background-repeat: no-repeat;
+        # Embed mód: csak a chat UI, Streamlit chrome nélkül
+        st.markdown(
             """
+            <style>
+              #MainMenu {visibility: hidden;}
+              header {visibility: hidden; height: 0;}
+              footer {visibility: hidden; height: 0;}
+              .block-container { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
-        css += """
-          }
-          /* A fő tartalom kapjon halvány fehér hátteret, hogy olvasható maradjon */
-          div.block-container {
-              padding-top: 0.5rem;
-              padding-bottom: 0.5rem;
-              background: rgba(255,255,255,0.94);
-              border-radius: 16px;
-          }
-        </style>
-        """
-
-        st.markdown(css, unsafe_allow_html=True)
 
 
     if not embed:
@@ -199,7 +181,6 @@ def render_chat(embed: bool) -> None:
         with st.chat_message("assistant"):
             st.markdown(response)
 
-
 def demo_assistant(user_text: str) -> str:
     return (
         f"{DEMO_ASSISTANT_PREFIX}`{user_text}`\n\n"
@@ -228,8 +209,10 @@ def _widget_injector_html(
     widget_icon_data_url: str,
 ) -> str:
     """
-    Floating widget injected via a Streamlit components iframe.
-    We DO NOT use Python f-strings for the HTML/JS to avoid `{}` parsing issues.
+    Stable widget:
+    - Injects into the PARENT document (Streamlit app page)
+    - 3 states: closed icon, centered small modal, full-screen modal
+    - Uses plain string template (no f-strings) to avoid `{}` issues.
     """
     brand_js = json.dumps(brand_name, ensure_ascii=False)
     color_js = json.dumps(primary_color, ensure_ascii=False)
@@ -241,29 +224,31 @@ def _widget_injector_html(
     tpl = r"""
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        overflow: visible;
-        background: transparent;
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
-      }
-      body { overscroll-behavior: none; }
-    </style>
-  </head>
+  <head><meta charset="utf-8"></head>
   <body>
-    <div id="tb-root"></div>
-
     <script>
       (function () {
-        const D = document;
+        const P = window.parent || window;
+        let D;
+        try { D = P.document; } catch (e) { D = document; }
 
-        const CONFIG = {
+        // If already injected (Streamlit reruns), just update config and exit.
+        const existing = D.getElementById("tbw-root");
+        if (existing) {
+          try {
+            P.__TBW_CONFIG__ = P.__TBW_CONFIG__ || {};
+            P.__TBW_CONFIG__.brandName = __BRAND__;
+            P.__TBW_CONFIG__.primaryColor = __COLOR__;
+            P.__TBW_CONFIG__.position = __POS__;
+            P.__TBW_CONFIG__.greetingText = __GREET__;
+            P.__TBW_CONFIG__.icon = __ICON__;
+            P.__TBW_CONFIG__.iconImage = __ICONIMG__;
+          } catch (e) {}
+          return;
+        }
+
+        // Global config stored on parent window
+        P.__TBW_CONFIG__ = {
           brandName: __BRAND__,
           primaryColor: __COLOR__,
           position: __POS__,
@@ -273,302 +258,296 @@ def _widget_injector_html(
           zIndex: 99999
         };
 
-        const frame = window.frameElement;
-
-        function applyFrameStyles(mode) {
-          if (!frame) return;
-
-          frame.style.border = "0";
-          frame.style.background = "transparent";
-          frame.style.overflow = "visible";
-          frame.style.position = "fixed";
-          frame.style.zIndex = String(CONFIG.zIndex);
-
-          const margin = 24;
-
-          if (CONFIG.position === "bottom-left") {
-            frame.style.left = margin + "px";
-            frame.style.right = "auto";
-          } else {
-            frame.style.right = margin + "px";
-            frame.style.left = "auto";
-          }
-          frame.style.bottom = margin + "px";
-          frame.style.top = "auto";
-
-          if (mode === "closed") {
-            frame.style.width = "56px";
-            frame.style.height = "56px";
-            frame.style.borderRadius = "999px";
-          } else if (mode === "small") {
-            const w = Math.min(520, Math.max(320, Math.floor(window.innerWidth * 0.92)));
-            const h = Math.min(620, Math.max(420, Math.floor(window.innerHeight * 0.78)));
-            frame.style.width = w + "px";
-            frame.style.height = h + "px";
-            frame.style.borderRadius = "16px";
-          } else if (mode === "full") {
-            frame.style.left = "0";
-            frame.style.right = "0";
-            frame.style.top = "0";
-            frame.style.bottom = "0";
-            frame.style.width = "100vw";
-            frame.style.height = "100vh";
-            frame.style.borderRadius = "0";
-          }
-        }
+        const CONFIG = P.__TBW_CONFIG__;
 
         function buildChatUrl(params = {}) {
-          const base = (window.parent && window.parent.location) ? window.parent.location.href : window.location.href;
-          const url = new URL(base);
+          const url = new URL(P.location.href);
           url.searchParams.set("page", "chat");
           url.searchParams.set("embed", "true");
           url.searchParams.delete("reset");
           url.searchParams.delete("export");
-          for (const [k, v] of Object.entries(params)) {
-            url.searchParams.set(k, v);
-          }
+          for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
           return url.toString();
         }
 
-        const root = D.getElementById("tb-root");
-        root.innerHTML = `
-          <style>
-            :root {
-              --tb-primary: ${CONFIG.primaryColor};
-              --tb-shadow: 0 12px 30px rgba(0,0,0,0.18);
-              --tb-radius: 16px;
-              --tb-header-h: 48px;
-            }
+        // ---------- Styles ----------
+        const style = D.createElement("style");
+        style.id = "tbw-style";
+        style.textContent = `
+          :root {
+            --tbw-primary: ${CONFIG.primaryColor};
+            --tbw-shadow: 0 18px 50px rgba(0,0,0,0.22);
+            --tbw-radius: 18px;
+            --tbw-header-h: 54px;
+            --tbw-font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+          }
 
-            #tb-button {
-              width: 56px;
-              height: 56px;
-              border-radius: 999px;
-              background: var(--tb-primary);
-              border: none;
-              cursor: pointer;
-              box-shadow: var(--tb-shadow);
-              color: #fff;
-              font-size: 22px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              user-select: none;
-            }
+          #tbw-root {
+            position: fixed;
+            z-index: ${CONFIG.zIndex};
+            font-family: var(--tbw-font);
+          }
 
-            #tb-window {
-              width: 100%;
-              height: 100%;
-              display: none;
-              background: transparent;
-            }
-            #tb-window.tb-open { display: block; }
+          /* Icon anchor */
+          #tbw-icon {
+            width: 58px;
+            height: 58px;
+            border-radius: 999px;
+            background: var(--tbw-primary);
+            box-shadow: var(--tbw-shadow);
+            border: none;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-size: 22px;
+            user-select: none;
+          }
 
-            #tb-overlay {
-              position: fixed;
-              inset: 0;
-              background: rgba(0,0,0,0.25);
-              display: none;
-            }
-            #tb-overlay.tb-open { display: block; }
+          #tbw-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.25);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s ease;
+            z-index: ${CONFIG.zIndex};
+          }
+          #tbw-overlay.tbw-open {
+            opacity: 1;
+            pointer-events: auto;
+          }
 
-            #tb-panel {
-              width: 100%;
-              height: 100%;
-              background: #fff;
-              box-shadow: var(--tb-shadow);
-              overflow: hidden;
-              border-radius: var(--tb-radius);
-            }
-            #tb-panel.tb-full { border-radius: 0; }
+          #tbw-modal {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%) scale(0.96);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform .22s ease, opacity .22s ease;
+            width: min(900px, 92vw);
+            height: min(640px, 80vh);
+            border-radius: var(--tbw-radius);
+            box-shadow: var(--tbw-shadow);
+            overflow: hidden;
+            background: #fff;
+            z-index: ${CONFIG.zIndex} + 1;
+          }
+          #tbw-modal.tbw-open {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, -50%) scale(1);
+          }
 
-            #tb-header {
-              height: var(--tb-header-h);
-              background: var(--tb-primary);
-              color: #fff;
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              padding: 0 10px 0 12px;
-              gap: 10px;
-            }
-            #tb-title {
-              font-weight: 600;
-              font-size: 14px;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-            #tb-actions {
-              display: flex;
-              align-items: center;
-              gap: 6px;
-            }
-            .tb-iconbtn {
-              width: 34px;
-              height: 34px;
-              border-radius: 10px;
-              border: 1px solid rgba(255,255,255,0.25);
-              background: rgba(255,255,255,0.08);
-              color: #fff;
-              cursor: pointer;
-              display: grid;
-              place-items: center;
-              font-size: 16px;
-            }
-            .tb-iconbtn:hover { background: rgba(255,255,255,0.14); }
+          /* Full-screen mode */
+          #tbw-modal.tbw-full {
+            left: 0;
+            top: 0;
+            transform: none;
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+          }
+          #tbw-modal.tbw-full.tbw-open {
+            transform: none;
+          }
 
-            #tb-iframe {
-              width: 100%;
-              height: calc(100% - var(--tb-header-h));
-              border: 0;
-              display: block;
-              background: #fff;
-            }
+          #tbw-header {
+            height: var(--tbw-header-h);
+            background: var(--tbw-primary);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px 0 14px;
+            gap: 10px;
+          }
+          #tbw-title {
+            font-weight: 650;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          #tbw-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .tbw-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            font-size: 16px;
+          }
+          .tbw-btn:hover { background: rgba(255,255,255,0.16); }
 
-            #tb-greeting {
-              position: absolute;
-              bottom: 70px;
-              right: 0;
-              max-width: 260px;
-              background: #fff;
-              color: #111;
-              padding: 10px 12px;
-              border-radius: 14px;
-              box-shadow: var(--tb-shadow);
-              font-size: 13px;
-              line-height: 1.25;
-              opacity: 0;
-              transform: translateY(6px);
-              transition: opacity .18s ease, transform .18s ease;
-              pointer-events: none;
-            }
-            #tb-greeting.tb-show { opacity: 1; transform: translateY(0); }
-          </style>
+          #tbw-body { height: calc(100% - var(--tbw-header-h)); background: #fff; }
+          #tbw-iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            display: block;
+            background: #fff;
+          }
 
-          <div style="position:relative; width:100%; height:100%;">
-            <div id="tb-greeting"></div>
-            <button id="tb-button" type="button" aria-label="Chat megnyitása"></button>
-
-            <div id="tb-window">
-              <div id="tb-overlay"></div>
-              <div id="tb-panel">
-                <div id="tb-header">
-                  <div id="tb-title"><span style="font-size:16px">💠</span><span></span></div>
-                  <div id="tb-actions">
-                    <button class="tb-iconbtn" id="tb-max" type="button" aria-label="Teljes képernyő">⛶</button>
-                    <button class="tb-iconbtn" id="tb-close" type="button" aria-label="Bezárás">✕</button>
-                  </div>
-                </div>
-                <iframe id="tb-iframe" loading="lazy"></iframe>
-              </div>
-            </div>
-          </div>
+          @media (prefers-reduced-motion: reduce) {
+            #tbw-overlay, #tbw-modal { transition: none !important; }
+          }
         `;
+        D.head.appendChild(style);
 
-        const btn = D.getElementById("tb-button");
-        const greeting = D.getElementById("tb-greeting");
-        const win = D.getElementById("tb-window");
-        const overlay = D.getElementById("tb-overlay");
-        const panel = D.getElementById("tb-panel");
-        const titleText = D.querySelector("#tb-title span:last-child");
-        const iframe = D.getElementById("tb-iframe");
-        const btnClose = D.getElementById("tb-close");
-        const btnMax = D.getElementById("tb-max");
+        // ---------- DOM ----------
+        const root = D.createElement("div");
+        root.id = "tbw-root";
 
-        if (CONFIG.position === "bottom-left") {
-          greeting.style.left = "0";
-          greeting.style.right = "auto";
-        }
+        // Position icon (only)
+        const margin = 24;
+        root.style.bottom = margin + "px";
+        root.style.left = (CONFIG.position === "bottom-left") ? (margin + "px") : "auto";
+        root.style.right = (CONFIG.position === "bottom-right") ? (margin + "px") : "auto";
 
-        titleText.textContent = CONFIG.brandName;
-        greeting.textContent = CONFIG.greetingText;
+        const iconBtn = D.createElement("button");
+        iconBtn.id = "tbw-icon";
+        iconBtn.type = "button";
+        iconBtn.setAttribute("aria-label", "Chat megnyitása");
 
         if (CONFIG.iconImage) {
-          btn.textContent = "";
-          btn.style.backgroundImage = "url(" + CONFIG.iconImage + ")";
-          btn.style.backgroundSize = "contain";
-          btn.style.backgroundRepeat = "no-repeat";
-          btn.style.backgroundPosition = "center";
+          iconBtn.textContent = "";
+          iconBtn.style.backgroundImage = "url(" + CONFIG.iconImage + ")";
+          iconBtn.style.backgroundSize = "contain";
+          iconBtn.style.backgroundRepeat = "no-repeat";
+          iconBtn.style.backgroundPosition = "center";
         } else {
-          btn.textContent = CONFIG.icon;
+          iconBtn.textContent = JSON.parse(__ICON__);
         }
 
+        const overlay = D.createElement("div");
+        overlay.id = "tbw-overlay";
+
+        const modal = D.createElement("div");
+        modal.id = "tbw-modal";
+
+        const header = D.createElement("div");
+        header.id = "tbw-header";
+
+        const title = D.createElement("div");
+        title.id = "tbw-title";
+        title.innerHTML = '<span style="font-size:16px">💠</span><span></span>';
+        title.querySelector("span:last-child").textContent = CONFIG.brandName;
+
+        const actions = D.createElement("div");
+        actions.id = "tbw-actions";
+
+        const btnFull = D.createElement("button");
+        btnFull.className = "tbw-btn";
+        btnFull.type = "button";
+        btnFull.setAttribute("aria-label", "Teljes képernyő / Kis ablak");
+        btnFull.textContent = "⛶";
+
+        const btnClose = D.createElement("button");
+        btnClose.className = "tbw-btn";
+        btnClose.type = "button";
+        btnClose.setAttribute("aria-label", "Bezárás");
+        btnClose.textContent = "✕";
+
+        actions.appendChild(btnFull);
+        actions.appendChild(btnClose);
+
+        header.appendChild(title);
+        header.appendChild(actions);
+
+        const body = D.createElement("div");
+        body.id = "tbw-body";
+
+        const iframe = D.createElement("iframe");
+        iframe.id = "tbw-iframe";
+        iframe.setAttribute("title", CONFIG.brandName + " chat");
+        iframe.setAttribute("loading", "lazy");
+
+        body.appendChild(iframe);
+
+        modal.appendChild(header);
+        modal.appendChild(body);
+
+        root.appendChild(iconBtn);
+
+        D.body.appendChild(overlay);
+        D.body.appendChild(modal);
+        D.body.appendChild(root);
+
+        // ---------- State ----------
+        // closed | small | full
         let state = "closed";
 
         function openSmall() {
           state = "small";
-          applyFrameStyles("small");
-          win.classList.add("tb-open");
-          panel.classList.remove("tb-full");
-          overlay.classList.remove("tb-open");
-          btn.style.display = "none";
-          greeting.classList.remove("tb-show");
+          overlay.classList.add("tbw-open");
+          modal.classList.add("tbw-open");
+          modal.classList.remove("tbw-full");
           iframe.src = buildChatUrl();
+          root.style.display = "none";
         }
 
         function openFull() {
           state = "full";
-          applyFrameStyles("full");
-          panel.classList.add("tb-full");
-          overlay.classList.add("tb-open");
-        }
-
-        function backToSmall() {
-          state = "small";
-          applyFrameStyles("small");
-          panel.classList.remove("tb-full");
-          overlay.classList.remove("tb-open");
+          overlay.classList.add("tbw-open");
+          modal.classList.add("tbw-open");
+          modal.classList.add("tbw-full");
+          if (!iframe.src || iframe.src === "about:blank") iframe.src = buildChatUrl();
+          root.style.display = "none";
         }
 
         function closeAll() {
           state = "closed";
-          applyFrameStyles("closed");
-          win.classList.remove("tb-open");
-          overlay.classList.remove("tb-open");
-          panel.classList.remove("tb-full");
+          overlay.classList.remove("tbw-open");
+          modal.classList.remove("tbw-open");
+          modal.classList.remove("tbw-full");
           iframe.src = "about:blank";
-          btn.style.display = "flex";
+          root.style.display = "block";
         }
 
-        applyFrameStyles("closed");
-
-        setTimeout(function () {
-          if (state !== "closed") return;
-          greeting.classList.add("tb-show");
-          setTimeout(function () { greeting.classList.remove("tb-show"); }, 6000);
-        }, 900);
-
-        btn.addEventListener("click", openSmall);
-        btnClose.addEventListener("click", closeAll);
-        btnMax.addEventListener("click", function () {
+        function toggleFull() {
           if (state === "small") openFull();
-          else if (state === "full") backToSmall();
-        });
-        overlay.addEventListener("click", function () {
-          if (state === "full") backToSmall();
+          else if (state === "full") openSmall();
+        }
+
+        // ---------- Events ----------
+        iconBtn.addEventListener("click", function () {
+          openSmall();
         });
 
-        window.addEventListener("keydown", function (e) {
-          if (e.key !== "Escape") return;
-          if (state === "full") backToSmall();
+        btnFull.addEventListener("click", function () {
+          toggleFull();
+        });
+
+        btnClose.addEventListener("click", function () {
+          closeAll();
+        });
+
+        overlay.addEventListener("click", function () {
+          if (state === "full") openSmall();
           else if (state === "small") closeAll();
         });
 
-        window.addEventListener("resize", function () {
-          if (state === "small") applyFrameStyles("small");
-          if (state === "full") applyFrameStyles("full");
+        P.addEventListener("keydown", function (e) {
+          if (e.key !== "Escape") return;
+          if (state === "full") openSmall();
+          else if (state === "small") closeAll();
         });
 
-        setInterval(function () {
-          if (!frame) return;
-          if (state === "closed") applyFrameStyles("closed");
-          if (state === "small") applyFrameStyles("small");
-          if (state === "full") applyFrameStyles("full");
-        }, 800);
+        // Safety: if Streamlit rerenders, keep DOM alive
+        P.__TBW_CLOSE__ = closeAll;
 
       })();
     </script>
