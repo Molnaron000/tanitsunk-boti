@@ -15,6 +15,8 @@ BRAND_NAME = "Tanitsunk Boti"
 PRIMARY_COLOR = "#0B2C5F"
 POSITION = "bottom-right"   # "bottom-right" vagy "bottom-left"
 GREETING_TEXT = "Szia! Segíthetek valamiben? Írj nyugodtan!"
+WIDGET_ICON = "💬"
+
 
 # PNG ikon (repo-ban)
 WIDGET_ICON_PNG_PATH = "assets/widget_icon.png"
