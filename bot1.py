@@ -184,7 +184,10 @@ def _widget_injector_html(
 
     icon_img_js = f"`{js_escape(widget_icon_data_url)}`" if widget_icon_data_url else "null"
 
-    # NOTE: We avoid JS template literals with ${...} to prevent Python f-string brace issues.
+    # NOTE:
+    # This is a Python f-string that contains JavaScript.
+    # Avoid JavaScript template-literal interpolations (dollar+curly) inside it,
+    # otherwise Python will try to evaluate the braces and crash.
     return f"""
 <!doctype html>
 <html>
@@ -201,6 +204,7 @@ def _widget_injector_html(
           D = document;
         }}
 
+        // Prevent duplicates on Streamlit reruns
         if (D.getElementById("tb-widget-root")) return;
 
         const CONFIG = {{
@@ -226,205 +230,210 @@ def _widget_injector_html(
         }}
 
         function injectStyles() {{
-          const style = D.createElement("style");
-          style.id = "tb-widget-style";
           const rightOrLeft = (CONFIG.position === "bottom-right") ? "right: 24px;" : "left: 24px;";
           const menuSide = (CONFIG.position === "bottom-right") ? "right: 8px;" : "left: 8px;";
           const greetSide = (CONFIG.position === "bottom-right") ? "right: 0;" : "left: 0;";
-          style.textContent = `
-            :root {{
-              --tb-primary: {primary_js};
-              --tb-shadow: 0 12px 30px rgba(0,0,0,0.18);
-              --tb-radius: 16px;
-              --tb-header-h: 48px;
-              --tb-font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
-            }}
 
-            #tb-widget-root {{
-              position: fixed;
-              ${rightOrLeft}
-              bottom: 24px;
-              z-index: ${CONFIG.zIndex};
-              font-family: var(--tb-font);
-            }}
+          const style = D.createElement("style");
+          style.id = "tb-widget-style";
 
-            #tb-widget-button {{
-              width: 56px;
-              height: 56px;
-              border-radius: 999px;
-              background: var(--tb-primary);
-              border: none;
-              cursor: pointer;
-              box-shadow: var(--tb-shadow);
-              color: #fff;
-              font-size: 22px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              user-select: none;
-            }}
-            #tb-widget-button:focus {{
-              outline: 3px solid rgba(255,255,255,0.35);
-              outline-offset: 2px;
-            }}
+          // Build CSS with concatenation (no template interpolation)
+          style.textContent =
+            `
+:root {{
+  --tb-primary: {primary_js};
+  --tb-shadow: 0 12px 30px rgba(0,0,0,0.18);
+  --tb-radius: 16px;
+  --tb-header-h: 48px;
+  --tb-font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+}}
 
-            #tb-greeting {{
-              position: absolute;
-              bottom: 72px;
-              ${greetSide}
-              max-width: 260px;
-              background: #fff;
-              color: #111;
-              padding: 10px 12px;
-              border-radius: 14px;
-              box-shadow: var(--tb-shadow);
-              font-size: 13px;
-              line-height: 1.25;
-              opacity: 0;
-              transform: translateY(6px);
-              transition: opacity .18s ease, transform .18s ease;
-              pointer-events: none;
-            }}
-            #tb-widget-root.tb-show-greeting #tb-greeting {{
-              opacity: 1;
-              transform: translateY(0);
-            }}
+#tb-widget-root {{
+  position: fixed;
+` + rightOrLeft + `
+  bottom: 24px;
+  z-index: ` + CONFIG.zIndex + `;
+  font-family: var(--tb-font);
+}}
 
-            #tb-overlay {{
-              position: fixed;
-              inset: 0;
-              background: rgba(0,0,0,0.25);
-              z-index: ${CONFIG.zIndex - 1};
-              opacity: 0;
-              pointer-events: none;
-              transition: opacity .18s ease;
-            }}
-            #tb-overlay.tb-open {{
-              opacity: 1;
-              pointer-events: auto;
-            }}
+#tb-widget-button {{
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--tb-primary);
+  border: none;
+  cursor: pointer;
+  box-shadow: var(--tb-shadow);
+  color: #fff;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}}
+#tb-widget-button:focus {{
+  outline: 3px solid rgba(255,255,255,0.35);
+  outline-offset: 2px;
+}}
 
-            #tb-window {{
-              position: fixed;
-              z-index: ${CONFIG.zIndex};
-              overflow: hidden;
-              background: #fff;
-              border-radius: var(--tb-radius);
-              box-shadow: var(--tb-shadow);
-              opacity: 0;
-              transform: translateY(8px) scale(0.98);
-              pointer-events: none;
-              transition: opacity .18s ease, transform .18s ease;
-            }}
-            #tb-window.tb-open {{
-              opacity: 1;
-              transform: translateY(0) scale(1);
-              pointer-events: auto;
-            }}
+#tb-greeting {{
+  position: absolute;
+  bottom: 72px;
+` + greetSide + `
+  max-width: 260px;
+  background: #fff;
+  color: #111;
+  padding: 10px 12px;
+  border-radius: 14px;
+  box-shadow: var(--tb-shadow);
+  font-size: 13px;
+  line-height: 1.25;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+}}
+#tb-widget-root.tb-show-greeting #tb-greeting {{
+  opacity: 1;
+  transform: translateY(0);
+}}
 
-            #tb-window.tb-small {{
-              width: min(520px, 92vw);
-              height: min(520px, 72vh);
-              ${rightOrLeft}
-              bottom: 96px;
-            }}
+#tb-overlay {{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  z-index: ` + (CONFIG.zIndex - 1) + `;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+}}
+#tb-overlay.tb-open {{
+  opacity: 1;
+  pointer-events: auto;
+}}
 
-            #tb-window.tb-full {{
-              inset: 0;
-              width: 100vw;
-              height: 100vh;
-              border-radius: 0;
-            }}
+#tb-window {{
+  position: fixed;
+  z-index: ` + CONFIG.zIndex + `;
+  overflow: hidden;
+  background: #fff;
+  border-radius: var(--tb-radius);
+  box-shadow: var(--tb-shadow);
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}}
+#tb-window.tb-open {{
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}}
 
-            #tb-header {{
-              height: var(--tb-header-h);
-              background: var(--tb-primary);
-              color: #fff;
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              padding: 0 10px 0 12px;
-              gap: 10px;
-            }}
-            #tb-title {{
-              font-weight: 600;
-              font-size: 14px;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }}
-            #tb-actions {{
-              display: flex;
-              align-items: center;
-              gap: 6px;
-            }}
-            .tb-iconbtn {{
-              width: 34px;
-              height: 34px;
-              border-radius: 10px;
-              border: 1px solid rgba(255,255,255,0.25);
-              background: rgba(255,255,255,0.08);
-              color: #fff;
-              cursor: pointer;
-              display: grid;
-              place-items: center;
-              font-size: 16px;
-            }}
-            .tb-iconbtn:hover {{
-              background: rgba(255,255,255,0.14);
-            }}
+#tb-window.tb-small {{
+  width: min(520px, 92vw);
+  height: min(520px, 72vh);
+` + rightOrLeft + `
+  bottom: 96px;
+}}
 
-            #tb-menu {{
-              position: absolute;
-              top: 54px;
-              ${menuSide}
-              background: #fff;
-              border-radius: 12px;
-              box-shadow: var(--tb-shadow);
-              border: 1px solid rgba(0,0,0,0.08);
-              overflow: hidden;
-              min-width: 220px;
-              display: none;
-              z-index: ${CONFIG.zIndex + 1};
-            }}
-            #tb-menu.tb-open {{
-              display: block;
-            }}
-            .tb-menuitem {{
-              padding: 10px 12px;
-              font-size: 13px;
-              cursor: pointer;
-              color: #111;
-            }}
-            .tb-menuitem:hover {{
-              background: rgba(0,0,0,0.05);
-            }}
-            .tb-menusep {{
-              height: 1px;
-              background: rgba(0,0,0,0.08);
-            }}
+#tb-window.tb-full {{
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+}}
 
-            #tb-iframewrap {{
-              height: calc(100% - var(--tb-header-h));
-              background: #fff;
-            }}
-            #tb-iframe {{
-              width: 100%;
-              height: 100%;
-              border: 0;
-              display: block;
-              background: #fff;
-            }}
+#tb-header {{
+  height: var(--tb-header-h);
+  background: var(--tb-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 0 12px;
+  gap: 10px;
+}}
+#tb-title {{
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+#tb-actions {{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}}
+.tb-iconbtn {{
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+}}
+.tb-iconbtn:hover {{
+  background: rgba(255,255,255,0.14);
+}}
 
-            @media (prefers-reduced-motion: reduce) {{
-              #tb-window, #tb-overlay, #tb-greeting {{
-                transition: none !important;
-              }}
-            }}
-          `;
+#tb-menu {{
+  position: absolute;
+  top: 54px;
+` + menuSide + `
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--tb-shadow);
+  border: 1px solid rgba(0,0,0,0.08);
+  overflow: hidden;
+  min-width: 220px;
+  display: none;
+  z-index: ` + (CONFIG.zIndex + 1) + `;
+}}
+#tb-menu.tb-open {{
+  display: block;
+}}
+.tb-menuitem {{
+  padding: 10px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #111;
+}}
+.tb-menuitem:hover {{
+  background: rgba(0,0,0,0.05);
+}}
+.tb-menusep {{
+  height: 1px;
+  background: rgba(0,0,0,0.08);
+}}
+
+#tb-iframewrap {{
+  height: calc(100% - var(--tb-header-h));
+  background: #fff;
+}}
+#tb-iframe {{
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #fff;
+}}
+
+@media (prefers-reduced-motion: reduce) {{
+  #tb-window, #tb-overlay, #tb-greeting {{
+    transition: none !important;
+  }}
+}}
+            `;
+
           D.head.appendChild(style);
         }}
 
@@ -524,7 +533,7 @@ def _widget_injector_html(
           D.body.appendChild(win);
           D.body.appendChild(root);
 
-          return { overlay, root, btn, win, btnMax, btnMenu, btnClose, menu, iframe };
+          return {{ overlay, root, btn, win, btnMax, btnMenu, btnClose, menu, iframe }};
         }}
 
         function setupLogic(nodes) {{
@@ -606,7 +615,7 @@ def _widget_injector_html(
             nodes.menu.classList.remove("tb-open");
 
             if (act === "new") {{
-              nodes.iframe.src = buildChatUrl({ reset: "1" });
+              nodes.iframe.src = buildChatUrl({{ reset: "1" }});
               return;
             }}
             if (act === "export") {{
