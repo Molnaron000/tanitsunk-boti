@@ -85,11 +85,24 @@ def apply_app_background() -> None:
 # ----------------------------
 def render_home() -> None:
     apply_app_background()
-    st.title("👋 Főoldal")
-    st.write("Kattints a lebegő ikonra lent a sarokban a chat megnyitásához.")
+
+    # Tiszta "landing" nézet: nincs cím/infó, csak a lebegő widget.
+    st.markdown(
+        """
+        <style>
+          #MainMenu {visibility: hidden;}
+          header {visibility: hidden;}
+          footer {visibility: hidden;}
+          /* Szedd le a Streamlit alap paddings */
+          div.block-container {padding-top: 0rem; padding-bottom: 0rem; max-width: 100%;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     icon_data_url = png_to_data_url(WIDGET_ICON_PNG_PATH)  # may be empty
 
+    # Lebegő widget (a saját iframe-ét teszi fixed pozícióba)
     components.html(
         _widget_injector_html(
             brand_name=BRAND_NAME,
@@ -102,8 +115,6 @@ def render_home() -> None:
         height=1,
         width=1,
     )
-
-    st.info("A widget a `?page=chat&embed=true` chat nézetet nyitja iframe-ben.")
 
 
 def render_chat(embed: bool) -> None:
@@ -269,16 +280,52 @@ def _widget_injector_html(
         function setFrame(mode) {{
           if (!frame) return;
 
+          // Streamlit inline styles néha felülírhatnak, ezért mindig újra beállítjuk
           frame.style.border = "0";
           frame.style.background = "transparent";
           frame.style.overflow = "visible";
           frame.style.position = "fixed";
           frame.style.zIndex = String(CONFIG.zIndex);
+          frame.style.pointerEvents = "auto";
+          frame.style.maxWidth = "100vw";
+          frame.style.maxHeight = "100vh";
 
+          const vw = (window.parent && window.parent.innerWidth) ? window.parent.innerWidth : window.innerWidth;
+          const vh = (window.parent && window.parent.innerHeight) ? window.parent.innerHeight : window.innerHeight;
+
+          // oldalsó pozíció
           if (CONFIG.position === "bottom-left") {{
             frame.style.left = "24px";
             frame.style.right = "auto";
           }} else {{
+            frame.style.right = "24px";
+            frame.style.left = "auto";
+          }}
+          frame.style.bottom = "24px";
+          frame.style.top = "auto";
+
+          if (mode === "closed") {{
+            frame.style.width = "56px";
+            frame.style.height = "56px";
+            frame.style.borderRadius = "999px";
+          }} else if (mode === "small") {{
+            // Reszponzív méret, hogy ne csússzon el kisebb kijelzőn
+            const w = Math.min(520, Math.max(320, vw - 48));
+            const h = Math.min(620, Math.max(420, vh - 140));
+            frame.style.width = w + "px";
+            frame.style.height = h + "px";
+            frame.style.borderRadius = "16px";
+          }} else if (mode === "full") {{
+            // Teljes képernyő (Streamlit wrapper miatt biztonságosan explicit px)
+            frame.style.left = "0";
+            frame.style.right = "0";
+            frame.style.top = "0";
+            frame.style.bottom = "0";
+            frame.style.width = vw + "px";
+            frame.style.height = vh + "px";
+            frame.style.borderRadius = "0";
+          }}
+        }} else {{
             frame.style.right = "24px";
             frame.style.left = "auto";
           }}
@@ -525,6 +572,18 @@ def _widget_injector_html(
         function closeAll() {{
           state = "closed";
           setFrame("closed");
+
+        // Biztosítsuk, hogy a keret stílusa ne vesszen el (Streamlit/DOM frissítés)
+        setInterval(function() {
+          if (state === "closed") return;
+          setFrame(state);
+        }, 500);
+
+        // Reszponzív újraszámolás
+        window.addEventListener("resize", function() {
+          if (state === "closed") return;
+          setFrame(state);
+        });
           win.classList.remove("tb-open");
           overlay.classList.remove("tb-open");
           panel.classList.remove("tb-full");
