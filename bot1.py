@@ -99,7 +99,6 @@ def render_chat(embed: bool) -> None:
     export_flag = _qp_get(qp, "export", "").lower() in ("1", "true", "yes")
 
     if embed:
-if embed:
         # Háttérkép betöltése (assets/background.png)
         bg_url = png_to_data_url("assets/background.png")
 
