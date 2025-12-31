@@ -1,50 +1,35 @@
-# Tanitsunk Boti – Streamlit app (Home + Chat) with floating widget
-# ---------------------------------------------------------------
-# Deploy: Streamlit Community Cloud (GitHub repo)
-#
-# How it works:
-# - Home view (default): injects a floating chat widget (HTML/CSS/JS) into the parent page
-# - Chat view (router): native Streamlit chat UI
-# - The widget opens the Chat view inside an iframe using query params: ?page=chat&embed=true
-#
-# Customize:
-#   BRAND_NAME, PRIMARY_COLOR, POSITION, GREETING_TEXT at the top of this file.
-
 from __future__ import annotations
 
-import time
-from typing import Any, Dict, Optional
+import base64
+from pathlib import Path
+from typing import Any, Dict
 
 import streamlit as st
 import streamlit.components.v1 as components
 
-
 # ----------------------------
-# CONFIG (customize here)
+# CONFIG (állítsd be itt)
 # ----------------------------
 BRAND_NAME = "Tanitsunk Boti"
-PRIMARY_COLOR = "#0B2C5F"   # dark blue
-POSITION = "bottom-right"   # "bottom-right" or "bottom-left"
+PRIMARY_COLOR = "#0B2C5F"
+POSITION = "bottom-right"   # "bottom-right" vagy "bottom-left"
 GREETING_TEXT = "Szia! Segíthetek valamiben? Írj nyugodtan!"
-WIDGET_ICON = "💬"          # can be emoji or leave as is
 
-# Chat behavior (demo)
+# PNG ikon (repo-ban)
+WIDGET_ICON_PNG_PATH = "assets/widget_icon.png"
+# Emoji fallback, ha nincs PNG
+WIDGET_ICON_FALLBACK = "💬"
+
 DEMO_ASSISTANT_PREFIX = "Rendben! Ezt írtad: "
 
 
 # ----------------------------
-# Helpers: query params compat
+# Query param helpers (kompatibilis több Streamlit verzióval)
 # ----------------------------
 def _get_query_params() -> Dict[str, Any]:
-    """
-    Streamlit changed query param APIs over versions.
-    This helper returns a dict-like mapping.
-    """
     try:
-        # New API (Streamlit 1.30+): st.query_params
         return dict(st.query_params)  # type: ignore[attr-defined]
     except Exception:
-        # Old API: experimental_get_query_params -> values are lists
         return st.experimental_get_query_params()
 
 
@@ -56,11 +41,7 @@ def _qp_get(qp: Dict[str, Any], key: str, default: str = "") -> str:
 
 
 def _set_query_params(**kwargs: str) -> None:
-    """
-    Set query params, compatible across Streamlit versions.
-    """
     try:
-        # New API
         st.query_params.clear()  # type: ignore[attr-defined]
         for k, v in kwargs.items():
             st.query_params[k] = v  # type: ignore[attr-defined]
@@ -68,64 +49,64 @@ def _set_query_params(**kwargs: str) -> None:
         st.experimental_set_query_params(**kwargs)
 
 
+@st.cache_data
+def png_to_data_url(rel_path: str) -> str:
+    """Load a PNG from repo and return as data:image/png;base64,..."""
+    p = Path(__file__).resolve().parent / rel_path
+    if not p.exists():
+        return ""
+    b64 = base64.b64encode(p.read_bytes()).decode("utf-8")
+    return f"data:image/png;base64,{b64}"
+
+
 # ----------------------------
-# Page router
+# Views
 # ----------------------------
 def render_home() -> None:
-    st.title("👋 Üdv a főoldalon")
-    st.write(
-        "Ez a Streamlit app egy lebegő chat widgetet injektál (ikon → kis ablak → teljes képernyő). "
-        "Kattints a jobb alsó sarokban lévő ikonra."
-    )
+    st.title("👋 Főoldal")
+    st.write("Kattints a lebegő ikonra lent a sarokban a chat megnyitásához.")
 
-    # Inject floating widget into the *parent* document (not just inside the component iframe).
-    # We render this component at height=0 so it doesn't affect layout.
+    icon_data_url = png_to_data_url(WIDGET_ICON_PNG_PATH)  # may be empty
+
     components.html(
         _widget_injector_html(
             brand_name=BRAND_NAME,
             primary_color=PRIMARY_COLOR,
             position=POSITION,
             greeting_text=GREETING_TEXT,
-            widget_icon=WIDGET_ICON,
+            widget_icon=WIDGET_ICON_FALLBACK,
+            widget_icon_data_url=icon_data_url,
         ),
         height=0,
         width=0,
     )
 
-    st.info(
-        "Tipp: A widget a chat oldalt iframe-ben nyitja meg a `?page=chat&embed=true` paraméterekkel."
-    )
+    st.info("A widget a `?page=chat&embed=true` chat nézetet nyitja iframe-ben.")
 
 
 def render_chat(embed: bool) -> None:
     if "messages" not in st.session_state:
-        st.session_state.messages = []  # list[dict(role, content)]
+        st.session_state.messages = []
 
     qp = _get_query_params()
 
-    # Handle reset param (triggered by widget menu)
-    reset_flag = _qp_get(qp, "reset", "")
-    if reset_flag in ("1", "true", "True", "yes"):
+    # reset triggered by widget menu
+    reset_flag = _qp_get(qp, "reset", "").lower() in ("1", "true", "yes")
+    if reset_flag:
         st.session_state.messages = []
-        # remove reset from URL
         _set_query_params(page="chat", embed="true" if embed else "false")
 
-    # Optional export param (open chat in new tab with ?export=1)
-    export_flag = _qp_get(qp, "export", "")
-    exporting = export_flag in ("1", "true", "True", "yes")
+    export_flag = _qp_get(qp, "export", "").lower() in ("1", "true", "yes")
 
-    # Embed mode: hide Streamlit chrome + tighten padding
     if embed:
         st.markdown(
             """
             <style>
-            /* Hide Streamlit default UI in embed mode */
-            #MainMenu {visibility: hidden;}
-            header {visibility: hidden;}
-            footer {visibility: hidden;}
-            .stApp {padding-top: 0rem;}
-            /* Reduce top/bottom padding inside main container */
-            div.block-container {padding-top: 0.5rem; padding-bottom: 0.5rem;}
+              #MainMenu {visibility: hidden;}
+              header {visibility: hidden;}
+              footer {visibility: hidden;}
+              .stApp {padding-top: 0rem;}
+              div.block-container {padding-top: 0.5rem; padding-bottom: 0.5rem;}
             </style>
             """,
             unsafe_allow_html=True,
@@ -133,38 +114,32 @@ def render_chat(embed: bool) -> None:
 
     if not embed:
         st.title(f"{BRAND_NAME} – Chat")
-        col1, col2, col3 = st.columns([1, 1, 2])
-        with col1:
+        c1, c2 = st.columns([1, 3])
+        with c1:
             if st.button("🧹 Új beszélgetés", use_container_width=True):
                 st.session_state.messages = []
-        with col2:
-            st.write("")  # spacer
-        with col3:
-            st.caption("A widgetből embed módban fut. Itt teljes nézetben is elérhető.")
+        with c2:
+            if export_flag:
+                txt = _export_chat_text(st.session_state.messages)
+                st.download_button(
+                    "⬇️ Beszélgetés letöltése (.txt)",
+                    data=txt.encode("utf-8"),
+                    file_name="tanitsunk-boti-beszelgetes.txt",
+                    mime="text/plain",
+                )
+        st.caption("A widgetből embed módban fut. Itt teljes nézetben is elérhető.")
+        st.divider()
 
-        if exporting:
-            txt = _export_chat_text(st.session_state.messages)
-            st.download_button(
-                "⬇️ Beszélgetés letöltése (.txt)",
-                data=txt.encode("utf-8"),
-                file_name="tanitsunk-boti-beszelgetes.txt",
-                mime="text/plain",
-            )
-            st.divider()
-
-    # Render existing messages
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # Input
     prompt = st.chat_input("Írj ide egy üzenetet…")
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Assistant response (DEMO). Replace this with your LLM call later.
         response = demo_assistant(prompt)
         st.session_state.messages.append({"role": "assistant", "content": response})
         with st.chat_message("assistant"):
@@ -172,26 +147,23 @@ def render_chat(embed: bool) -> None:
 
 
 def demo_assistant(user_text: str) -> str:
-    # Very simple placeholder logic:
-    # You can swap this with an OpenAI / Gemini / etc. call later.
-    # Keep it deterministic so the app works out-of-the-box.
     return (
         f"{DEMO_ASSISTANT_PREFIX}`{user_text}`\n\n"
-        "Ha szeretnéd, a következő lépésben bekötöm az OpenAI / Gemini API-t is (st.secrets kulccsal)."
+        "Ha kéred, bekötöm a Gemini/OpenAI API-t is st.secrets kulccsal."
     )
 
 
 def _export_chat_text(messages: list[dict]) -> str:
-    lines = []
+    if not messages:
+        return "(nincs üzenet)"
+    out = []
     for m in messages:
-        role = m.get("role", "unknown")
-        content = m.get("content", "")
-        lines.append(f"{role.upper()}: {content}")
-    return "\n\n".join(lines) if lines else "(nincs üzenet)"
+        out.append(f"{m.get('role','?').upper()}: {m.get('content','')}")
+    return "\n\n".join(out)
 
 
 # ----------------------------
-# Widget injector (HTML/CSS/JS)
+# Widget injector (HTML/CSS/JS) – parent DOM-ba injektál
 # ----------------------------
 def _widget_injector_html(
     brand_name: str,
@@ -199,12 +171,8 @@ def _widget_injector_html(
     position: str,
     greeting_text: str,
     widget_icon: str,
+    widget_icon_data_url: str,
 ) -> str:
-    """
-    Returns HTML that runs inside a Streamlit component iframe, but injects the widget into window.parent.document.
-    This allows true floating overlays above the entire Streamlit page.
-    """
-    # Basic sanitization for embedding into JS strings
     def js_escape(s: str) -> str:
         return s.replace("\\", "\\\\").replace("`", "\\`")
 
@@ -214,6 +182,9 @@ def _widget_injector_html(
     position_js = js_escape(position)
     icon_js = js_escape(widget_icon)
 
+    icon_img_js = f"`{js_escape(widget_icon_data_url)}`" if widget_icon_data_url else "null"
+
+    # NOTE: We avoid JS template literals with ${...} to prevent Python f-string brace issues.
     return f"""
 <!doctype html>
 <html>
@@ -221,10 +192,15 @@ def _widget_injector_html(
   <body>
     <script>
       (function() {{
-        const P = window.parent;
-        const D = P.document;
+        // Try injecting into parent page. If blocked, fall back to local document.
+        const P = window.parent || window;
+        let D;
+        try {{
+          D = P.document;
+        }} catch (e) {{
+          D = document;
+        }}
 
-        // Prevent duplicates on Streamlit reruns
         if (D.getElementById("tb-widget-root")) return;
 
         const CONFIG = {{
@@ -233,14 +209,14 @@ def _widget_injector_html(
           position: `{position_js}`,
           greetingText: `{greeting_js}`,
           icon: `{icon_js}`,
-          zIndex: 99999,
+          iconImage: {icon_img_js},
+          zIndex: 99999
         }};
 
         function buildChatUrl(params={{}}) {{
           const url = new URL(P.location.href);
           url.searchParams.set("page", "chat");
           url.searchParams.set("embed", "true");
-          // remove flags unless explicitly set
           url.searchParams.delete("reset");
           url.searchParams.delete("export");
           for (const [k,v] of Object.entries(params)) {{
@@ -252,6 +228,9 @@ def _widget_injector_html(
         function injectStyles() {{
           const style = D.createElement("style");
           style.id = "tb-widget-style";
+          const rightOrLeft = (CONFIG.position === "bottom-right") ? "right: 24px;" : "left: 24px;";
+          const menuSide = (CONFIG.position === "bottom-right") ? "right: 8px;" : "left: 8px;";
+          const greetSide = (CONFIG.position === "bottom-right") ? "right: 0;" : "left: 0;";
           style.textContent = `
             :root {{
               --tb-primary: {primary_js};
@@ -263,13 +242,12 @@ def _widget_injector_html(
 
             #tb-widget-root {{
               position: fixed;
-              { "right: 24px;" if position_js=="bottom-right" else "left: 24px;" }
+              ${rightOrLeft}
               bottom: 24px;
-              z-index: {99999};
+              z-index: ${CONFIG.zIndex};
               font-family: var(--tb-font);
             }}
 
-            /* Floating icon */
             #tb-widget-button {{
               width: 56px;
               height: 56px;
@@ -290,11 +268,10 @@ def _widget_injector_html(
               outline-offset: 2px;
             }}
 
-            /* Greeting bubble */
             #tb-greeting {{
               position: absolute;
               bottom: 72px;
-              { "right: 0;" if position_js=="bottom-right" else "left: 0;" }
+              ${greetSide}
               max-width: 260px;
               background: #fff;
               color: #111;
@@ -313,12 +290,11 @@ def _widget_injector_html(
               transform: translateY(0);
             }}
 
-            /* Overlay */
             #tb-overlay {{
               position: fixed;
               inset: 0;
               background: rgba(0,0,0,0.25);
-              z-index: {99998};
+              z-index: ${CONFIG.zIndex - 1};
               opacity: 0;
               pointer-events: none;
               transition: opacity .18s ease;
@@ -328,10 +304,9 @@ def _widget_injector_html(
               pointer-events: auto;
             }}
 
-            /* Window */
             #tb-window {{
               position: fixed;
-              z-index: {99999};
+              z-index: ${CONFIG.zIndex};
               overflow: hidden;
               background: #fff;
               border-radius: var(--tb-radius);
@@ -347,15 +322,13 @@ def _widget_injector_html(
               pointer-events: auto;
             }}
 
-            /* Small mode geometry */
             #tb-window.tb-small {{
               width: min(520px, 92vw);
               height: min(520px, 72vh);
-              { "right: 24px;" if position_js=="bottom-right" else "left: 24px;" }
+              ${rightOrLeft}
               bottom: 96px;
             }}
 
-            /* Full mode geometry */
             #tb-window.tb-full {{
               inset: 0;
               width: 100vw;
@@ -363,7 +336,6 @@ def _widget_injector_html(
               border-radius: 0;
             }}
 
-            /* Header */
             #tb-header {{
               height: var(--tb-header-h);
               background: var(--tb-primary);
@@ -405,11 +377,10 @@ def _widget_injector_html(
               background: rgba(255,255,255,0.14);
             }}
 
-            /* Menu dropdown */
             #tb-menu {{
               position: absolute;
               top: 54px;
-              { "right: 8px;" if position_js=="bottom-right" else "left: 8px;" }
+              ${menuSide}
               background: #fff;
               border-radius: 12px;
               box-shadow: var(--tb-shadow);
@@ -417,7 +388,7 @@ def _widget_injector_html(
               overflow: hidden;
               min-width: 220px;
               display: none;
-              z-index: {100000};
+              z-index: ${CONFIG.zIndex + 1};
             }}
             #tb-menu.tb-open {{
               display: block;
@@ -436,7 +407,6 @@ def _widget_injector_html(
               background: rgba(0,0,0,0.08);
             }}
 
-            /* Iframe area */
             #tb-iframewrap {{
               height: calc(100% - var(--tb-header-h));
               background: #fff;
@@ -464,7 +434,6 @@ def _widget_injector_html(
 
           const root = D.createElement("div");
           root.id = "tb-widget-root";
-          root.setAttribute("aria-label", "Tanitsunk Boti widget");
 
           const greeting = D.createElement("div");
           greeting.id = "tb-greeting";
@@ -474,9 +443,17 @@ def _widget_injector_html(
           btn.id = "tb-widget-button";
           btn.type = "button";
           btn.setAttribute("aria-label", "Chat megnyitása");
-          btn.textContent = CONFIG.icon;
 
-          // Window
+          if (CONFIG.iconImage) {{
+            btn.textContent = "";
+            btn.style.backgroundImage = "url(" + CONFIG.iconImage + ")";
+            btn.style.backgroundSize = "contain";
+            btn.style.backgroundRepeat = "no-repeat";
+            btn.style.backgroundPosition = "center";
+          }} else {{
+            btn.textContent = CONFIG.icon;
+          }}
+
           const win = D.createElement("div");
           win.id = "tb-window";
           win.className = "tb-small";
@@ -486,7 +463,7 @@ def _widget_injector_html(
 
           const title = D.createElement("div");
           title.id = "tb-title";
-          title.innerHTML = `<span style="font-size:16px">💠</span><span>${{CONFIG.brandName}}</span>`;
+          title.innerHTML = '<span style="font-size:16px">💠</span><span>' + CONFIG.brandName + '</span>';
 
           const actions = D.createElement("div");
           actions.id = "tb-actions";
@@ -522,21 +499,19 @@ def _widget_injector_html(
           const iframe = D.createElement("iframe");
           iframe.id = "tb-iframe";
           iframe.src = buildChatUrl();
-          iframe.setAttribute("title", `${{CONFIG.brandName}} chat`);
+          iframe.setAttribute("title", CONFIG.brandName + " chat");
           iframe.setAttribute("loading", "lazy");
 
           iframeWrap.appendChild(iframe);
 
-          // Menu
           const menu = D.createElement("div");
           menu.id = "tb-menu";
-          menu.innerHTML = `
-            <div class="tb-menuitem" data-action="new">🧹 Új beszélgetés</div>
-            <div class="tb-menuitem" data-action="export">⬇️ Export / letöltés</div>
-            <div class="tb-menuitem" data-action="open">↗️ Megnyitás új lapon</div>
-            <div class="tb-menusep"></div>
-            <div class="tb-menuitem" data-action="privacy">🔒 Adatkezelés</div>
-          `;
+          menu.innerHTML = ''
+            + '<div class="tb-menuitem" data-action="new">🧹 Új beszélgetés</div>'
+            + '<div class="tb-menuitem" data-action="export">⬇️ Export / letöltés</div>'
+            + '<div class="tb-menuitem" data-action="open">↗️ Megnyitás új lapon</div>'
+            + '<div class="tb-menusep"></div>'
+            + '<div class="tb-menuitem" data-action="privacy">🔒 Adatkezelés</div>';
 
           win.appendChild(header);
           win.appendChild(menu);
@@ -549,7 +524,7 @@ def _widget_injector_html(
           D.body.appendChild(win);
           D.body.appendChild(root);
 
-          return {{ overlay, root, btn, greeting, win, btnMax, btnMenu, btnClose, menu, iframe }};
+          return { overlay, root, btn, win, btnMax, btnMenu, btnClose, menu, iframe };
         }}
 
         function setupLogic(nodes) {{
@@ -591,37 +566,32 @@ def _widget_injector_html(
             nodes.menu.classList.toggle("tb-open");
           }}
 
-          // Greeting bubble: show once after a short delay
-          setTimeout(() => {{
+          setTimeout(function() {{
             if (greetingShown) return;
             greetingShown = true;
             nodes.root.classList.add("tb-show-greeting");
-            setTimeout(() => nodes.root.classList.remove("tb-show-greeting"), 6000);
+            setTimeout(function() {{ nodes.root.classList.remove("tb-show-greeting"); }}, 6000);
           }}, 900);
 
-          nodes.btn.addEventListener("click", () => {{
+          nodes.btn.addEventListener("click", function() {{
             openSmall();
           }});
 
-          nodes.btnClose.addEventListener("click", () => closeAll());
-          nodes.btnMax.addEventListener("click", () => toggleMax());
-          nodes.btnMenu.addEventListener("click", () => toggleMenu());
+          nodes.btnClose.addEventListener("click", function() {{ closeAll(); }});
+          nodes.btnMax.addEventListener("click", function() {{ toggleMax(); }});
+          nodes.btnMenu.addEventListener("click", function() {{ toggleMenu(); }});
 
-          // Overlay click behavior
-          nodes.overlay.addEventListener("click", () => {{
+          nodes.overlay.addEventListener("click", function() {{
             if (state === "small") closeAll();
-            // full mode: do nothing
           }});
 
-          // ESC handling
-          P.addEventListener("keydown", (e) => {{
+          P.addEventListener("keydown", function(e) {{
             if (e.key !== "Escape") return;
             if (state === "full") openSmall();
             else if (state === "small") closeAll();
           }});
 
-          // Click outside menu closes it
-          P.addEventListener("click", (e) => {{
+          P.addEventListener("click", function(e) {{
             if (!nodes.menu.classList.contains("tb-open")) return;
             const t = e.target;
             if (!nodes.menu.contains(t) && t !== nodes.btnMenu) {{
@@ -629,19 +599,17 @@ def _widget_injector_html(
             }}
           }}, true);
 
-          // Menu actions
-          nodes.menu.addEventListener("click", (e) => {{
+          nodes.menu.addEventListener("click", function(e) {{
             const item = e.target.closest(".tb-menuitem");
             if (!item) return;
             const act = item.getAttribute("data-action");
             nodes.menu.classList.remove("tb-open");
 
             if (act === "new") {{
-              nodes.iframe.src = buildChatUrl({{ reset: "1" }});
+              nodes.iframe.src = buildChatUrl({ reset: "1" });
               return;
             }}
             if (act === "export") {{
-              // Open export in new tab (so download UI is clearer)
               const url = new URL(P.location.href);
               url.searchParams.set("page","chat");
               url.searchParams.delete("embed");
@@ -657,8 +625,7 @@ def _widget_injector_html(
               return;
             }}
             if (act === "privacy") {{
-              // Placeholder: replace with your privacy policy URL
-              alert("Ide jön az Adatkezelési tájékoztató linkje.");
+              alert("Ide jön az Adatkezelési tájékoztató linkje (később beírjuk).");
               return;
             }}
           }});
@@ -674,14 +641,11 @@ def _widget_injector_html(
 """
 
 
-# ----------------------------
-# Main
-# ----------------------------
 def main() -> None:
     st.set_page_config(page_title=BRAND_NAME, layout="wide")
     qp = _get_query_params()
-    page = _qp_get(qp, "page", "home").lower().strip()
-    embed = _qp_get(qp, "embed", "").lower().strip() in ("1", "true", "yes")
+    page = _qp_get(qp, "page", "home").strip().lower()
+    embed = _qp_get(qp, "embed", "").strip().lower() in ("1", "true", "yes")
 
     if page == "chat":
         render_chat(embed=embed)
