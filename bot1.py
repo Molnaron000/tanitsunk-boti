@@ -5,8 +5,11 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
+import httpx
 import streamlit as st
 import streamlit.components.v1 as components
+from google import genai
+from google.genai import errors, types
 
 # ----------------------------
 # CONFIG (állítsd be itt)
@@ -23,7 +26,7 @@ WIDGET_ICON_PNG_PATH = "assets/widget_icon.png"
 # Emoji fallback, ha nincs PNG
 WIDGET_ICON_FALLBACK = "💬"
 
-DEMO_ASSISTANT_PREFIX = "Rendben! Ezt írtad: "
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 
 # ----------------------------
@@ -128,7 +131,7 @@ def render_chat(embed: bool) -> None:
     reset_flag = _qp_get(qp, "reset", "").lower() in ("1", "true", "yes")
     if reset_flag:
         st.session_state.messages = []
-        _set_query_params(page="chat", embed="true" if embed else "false")
+        _set_query_params(page="chat", widget="true" if embed else "false")
 
     export_flag = _qp_get(qp, "export", "").lower() in ("1", "true", "yes")
 
@@ -171,21 +174,80 @@ def render_chat(embed: bool) -> None:
             st.markdown(msg["content"])
 
     prompt = st.chat_input("Írj ide egy üzenetet…")
-    if prompt:
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    if prompt and prompt.strip():
+        user_message = {"role": "user", "content": prompt.strip()}
         with st.chat_message("user"):
-            st.markdown(prompt)
+            st.markdown(user_message["content"])
 
-        response = demo_assistant(prompt)
-        st.session_state.messages.append({"role": "assistant", "content": response})
         with st.chat_message("assistant"):
-            st.markdown(response)
+            with st.spinner("Boti válaszol…"):
+                response, error = gemini_assistant(
+                    [*st.session_state.messages, user_message]
+                )
+            if error:
+                st.warning(error)
+            else:
+                st.markdown(response)
+                # Csak a sikeres forduló kerül az előzményekbe.
+                st.session_state.messages.extend([
+                    user_message,
+                    {"role": "assistant", "content": response},
+                ])
 
-def demo_assistant(user_text: str) -> str:
-    return (
-        f"{DEMO_ASSISTANT_PREFIX}`{user_text}`\n\n"
-        "Ha kéred, bekötöm a Gemini/OpenAI API-t is st.secrets kulccsal."
-    )
+def gemini_assistant(messages: list[dict]) -> tuple[str | None, str | None]:
+    """(válasz, hiba); a kapott előzményeket nem módosítja."""
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        model = st.secrets.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
+    except Exception:
+        # Hiányzó fájl/kulcs és hibás TOML esetén sem áll le a chat.
+        return None, "A Gemini nincs beállítva. Ellenőrizd a GEMINI_API_KEY értékét a Streamlit Secrets beállításban."
+
+    if not isinstance(api_key, str) or not api_key.strip():
+        return None, "Hiányzik a Gemini API-kulcs. Állíts be egy nem üres GEMINI_API_KEY értéket a Streamlit Secrets beállításban."
+    if not isinstance(model, str) or not model.strip():
+        return None, "A GEMINI_MODEL értéke legyen egy nem üres modellazonosító."
+
+    try:
+        contents = [
+            types.Content(
+                role="model" if message["role"] == "assistant" else "user",
+                parts=[types.Part.from_text(text=message["content"])],
+            )
+            for message in messages
+        ]
+        # Saját kliens kérésenként; nincs megosztott chatállapot vagy kulcs-cache.
+        with genai.Client(
+            api_key=api_key.strip(),
+            http_options=types.HttpOptions(
+                timeout=30_000,  # milliszekundum
+                retry_options=types.HttpRetryOptions(attempts=1),
+            ),
+        ) as client:
+            result = client.models.generate_content(
+                model=model.strip(), contents=contents
+            )
+        text = (result.text or "").strip()
+        if not text:
+            return None, "A Gemini nem adott szöveges választ. Fogalmazd át vagy küldd újra az üzenetet."
+        return text, None
+    except errors.APIError as exc:
+        if exc.code == 429:
+            return None, "Elérted a Gemini kvótáját vagy kéréskorlátját. Próbáld újra később; tartós hiba esetén ellenőrizd a projekt kvótáját."
+        if exc.code in (401, 403):
+            return None, "A Gemini elutasította a hozzáférést. Ellenőrizd az API-kulcsot és a projekt jogosultságait."
+        if exc.code == 404:
+            return None, "A megadott Gemini-modell nem érhető el. Ellenőrizd a GEMINI_MODEL értékét."
+        if exc.code in (408, 504):
+            return None, "A Gemini-kérés időtúllépés miatt megszakadt. Küldd újra az üzenetet."
+        if exc.code >= 500:
+            return None, "A Gemini átmenetileg nem érhető el. Próbáld újra később."
+        return None, "A Gemini elutasította a kérést. Ellenőrizd az API-kulcsot és a modell beállítását."
+    except (httpx.RequestError, TimeoutError, ConnectionError):
+        return None, "Hálózati hiba vagy időtúllépés történt. Ellenőrizd a kapcsolatot, majd küldd újra az üzenetet."
+    except Exception:
+        # Nyers kivételt (és esetleges kulcsot) nem jelenítünk meg a felületen.
+        return None, "Most nem sikerült választ kérni. Próbáld újra később."
 
 
 def _export_chat_text(messages: list[dict]) -> str:
@@ -264,6 +326,7 @@ def _widget_injector_html(
           const url = new URL(P.location.href);
           url.searchParams.set("page", "chat");
           url.searchParams.set("embed", "true");
+          url.searchParams.set("widget", "true");
           url.searchParams.delete("reset");
           url.searchParams.delete("export");
           for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
@@ -568,7 +631,8 @@ def main() -> None:
     st.set_page_config(page_title=BRAND_NAME, layout="wide")
     qp = _get_query_params()
     page = _qp_get(qp, "page", "home").strip().lower()
-    embed = _qp_get(qp, "embed", "").strip().lower() in ("1", "true", "yes")
+    # Az embed fenntartott Streamlit-paraméter; a saját UI-jelölőnk a widget.
+    embed = _qp_get(qp, "widget", "").strip().lower() in ("1", "true", "yes")
 
     if page == "chat":
         render_chat(embed=embed)
